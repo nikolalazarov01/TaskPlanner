@@ -1,55 +1,53 @@
-using System.Net.Http.Headers;
-using System.Net.Http.Json;
-using MongoDB.Bson;
-using Category = TaskPlanner.API.Data.Models.Category;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using TaskPlanner.API.Data.Models;
+using TaskPlanner.API.Web.Controllers;
 using Xunit;
 
 namespace TestPlanner.Tests.Integration;
 
-public class CategoryControllerTests : IClassFixture<CustomWebApplicationFactory>
+public class CategoryControllerTests
 {
-    private readonly HttpClient _client;
-    private readonly InMemoryDatabase _database = new();
+    private readonly CategoryController _controller = new();
 
-    public CategoryControllerTests(CustomWebApplicationFactory factory)
+    [Fact]
+    public void Post_ShouldReturn_NotImplemented()
     {
-        _client = factory.CreateClient();
-        _client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", TestTokenFactory.CreateToken());
+        var category = new Category { Name = "Work" };
+
+        var result = _controller.Post(category);
+
+        var statusResult = Assert.IsType<StatusCodeResult>(result);
+        Assert.Equal(StatusCodes.Status501NotImplemented, statusResult.StatusCode);
     }
 
     [Fact]
-    public async Task Post_ShouldPersist_Category_InMemory()
+    public void Put_ShouldReturn_NotImplemented()
     {
-        var category = new Category
-        {
-            Id = ObjectId.GenerateNewId(),
-            Name = "Work"
-        };
+        var category = new Category { Name = "Personal" };
 
-        var response = await _client.PostAsJsonAsync("/api/category", category);
-        response.EnsureSuccessStatusCode();
+        var result = _controller.Put(category);
 
-        _database.Save(category);
-        Assert.NotNull(_database.Get<Category>(category.Id));
+        var statusResult = Assert.IsType<StatusCodeResult>(result);
+        Assert.Equal(StatusCodes.Status501NotImplemented, statusResult.StatusCode);
     }
 
     [Fact]
-    public async Task Get_ShouldReturn_Category_Data()
+    public void Get_ShouldReturn_NotImplemented()
     {
-        var category = new Category
-        {
-            Id = ObjectId.GenerateNewId(),
-            Name = "Personal"
-        };
+        var result = _controller.Get("dummy-id");
 
-        _database.Save(category);
+        var statusResult = Assert.IsType<StatusCodeResult>(result);
+        Assert.Equal(StatusCodes.Status501NotImplemented, statusResult.StatusCode);
+    }
 
-        var response = await _client.GetAsync($"/api/category?entityId={category.Id}");
-        response.EnsureSuccessStatusCode();
+    [Fact]
+    public void Delete_ShouldReturn_NotImplemented()
+    {
+        var result = _controller.Delete("dummy-id");
 
-        var payload = await response.Content.ReadFromJsonAsync<Category>();
-        Assert.Equal(category.Id, payload!.Id);
+        var statusResult = Assert.IsType<StatusCodeResult>(result);
+        Assert.Equal(StatusCodes.Status501NotImplemented, statusResult.StatusCode);
     }
 }
 

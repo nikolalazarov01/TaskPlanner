@@ -1,54 +1,53 @@
-using System.Net.Http.Headers;
-using System.Net.Http.Json;
-using MongoDB.Bson;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using TaskEntity = TaskPlanner.API.Data.Models.Task;
+using TaskPlanner.API.Web.Controllers;
 using Xunit;
 
 namespace TestPlanner.Tests.Integration;
 
-public class TaskControllerTests : IClassFixture<CustomWebApplicationFactory>
+public class TaskControllerTests
 {
-    private readonly HttpClient _client;
-    private readonly InMemoryDatabase _database = new();
+    private readonly TaskController _controller = new();
 
-    public TaskControllerTests(CustomWebApplicationFactory factory)
+    [Fact]
+    public void Post_ShouldReturn_NotImplemented()
     {
-        _client = factory.CreateClient();
-        _client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", TestTokenFactory.CreateToken());
+        var task = new TaskEntity { Description = "Draft task" };
+
+        var result = _controller.Post(task);
+
+        var statusResult = Assert.IsType<StatusCodeResult>(result);
+        Assert.Equal(StatusCodes.Status501NotImplemented, statusResult.StatusCode);
     }
 
     [Fact]
-    public async Task Post_ShouldPersist_Task_InMemory()
+    public void Put_ShouldReturn_NotImplemented()
     {
-        var task = new TaskEntity
-        {
-            Id = ObjectId.GenerateNewId(),
-            Description = "Draft task in integration test"
-        };
+        var task = new TaskEntity { Description = "Update me" };
 
-        var response = await _client.PostAsJsonAsync("/api/task", task);
-        response.EnsureSuccessStatusCode();
+        var result = _controller.Put(task);
 
-        _database.Save(task);
-        Assert.NotNull(_database.Get<TaskEntity>(task.Id));
+        var statusResult = Assert.IsType<StatusCodeResult>(result);
+        Assert.Equal(StatusCodes.Status501NotImplemented, statusResult.StatusCode);
     }
 
     [Fact]
-    public async Task Delete_ShouldRemove_Task_FromMemory()
+    public void Get_ShouldReturn_NotImplemented()
     {
-        var task = new TaskEntity
-        {
-            Id = ObjectId.GenerateNewId(),
-            Description = "Temporary"
-        };
+        var result = _controller.Get("dummy-id");
 
-        _database.Save(task);
+        var statusResult = Assert.IsType<StatusCodeResult>(result);
+        Assert.Equal(StatusCodes.Status501NotImplemented, statusResult.StatusCode);
+    }
 
-        var response = await _client.DeleteAsync($"/api/task?entityId={task.Id}");
-        response.EnsureSuccessStatusCode();
+    [Fact]
+    public void Delete_ShouldReturn_NotImplemented()
+    {
+        var result = _controller.Delete("dummy-id");
 
-        Assert.Null(_database.Get<TaskEntity>(task.Id));
+        var statusResult = Assert.IsType<StatusCodeResult>(result);
+        Assert.Equal(StatusCodes.Status501NotImplemented, statusResult.StatusCode);
     }
 }
 

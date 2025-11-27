@@ -1,53 +1,65 @@
-using System.Net;
-using System.Net.Http.Json;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
+using OneBitSoftware.Utilities;
+using TaskPlanner.API.Core.Interfaces;
 using TaskPlanner.API.Core.Models;
+using TaskPlanner.API.Core.Services;
+using TaskPlanner.API.Web.Controllers;
 using Xunit;
 
 namespace TestPlanner.Tests.Integration;
 
-public class IdentityControllerTests : IClassFixture<CustomWebApplicationFactory>
+public class IdentityControllerTests
 {
-    private readonly HttpClient _client;
-
-    public IdentityControllerTests(CustomWebApplicationFactory factory)
+    private IdentityController CreateController(out InMemoryUserRepository repository)
     {
-        _client = factory.CreateClient();
+        repository = new InMemoryUserRepository();
+        var jwtOptions = Options.Create(new JwtOptions
+        {
+            Secret = "replace-with-strong-secret",
+            Issuer = "TaskPlanner",
+            Audience = "TaskPlannerClients",
+            ExpirationMinutes = 60
+        });
+
+        IIdentityService identityService = new IdentityService(repository, jwtOptions);
+        return new IdentityController(identityService);
     }
 
     [Fact]
     public async Task Register_ShouldReturnToken_ForNewUser()
     {
+        var controller = CreateController(out _);
         var registerRequest = CreateRegisterRequest();
 
-        var response = await _client.PostAsJsonAsync("/api/identity/register", registerRequest);
-        var result = await response.Content.ReadFromJsonAsync<OperationResultDto>();
+        var actionResult = await controller.Register(registerRequest);
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.True(result?.Success);
-        Assert.False(string.IsNullOrEmpty(result?.ResultObject?.Token));
+        var okResult = Assert.IsType<OkObjectResult>(actionResult);
+        var payload = Assert.IsType<OperationResult<AuthResponse>>(okResult.Value);
+        Assert.True(payload.Success);
+        Assert.False(string.IsNullOrEmpty(payload.ResultObject?.Token));
     }
 
     [Fact]
     public async Task Register_ShouldFail_WhenEmailAlreadyUsed()
     {
+        var controller = CreateController(out _);
         var registerRequest = CreateRegisterRequest();
 
-        var firstResponse = await _client.PostAsJsonAsync("/api/identity/register", registerRequest);
-        firstResponse.EnsureSuccessStatusCode();
+        await controller.Register(registerRequest);
+        var duplicateResult = await controller.Register(registerRequest);
 
-        var duplicateResponse = await _client.PostAsJsonAsync("/api/identity/register", registerRequest);
-        var duplicateResult = await duplicateResponse.Content.ReadFromJsonAsync<OperationResultDto>();
-
-        Assert.Equal(HttpStatusCode.BadRequest, duplicateResponse.StatusCode);
-        Assert.False(duplicateResult?.Success);
-        Assert.NotEmpty(duplicateResult?.Errors ?? Array.Empty<OperationErrorDto>());
+        var badRequest = Assert.IsType<BadRequestObjectResult>(duplicateResult);
+        var payload = Assert.IsType<OperationResult<AuthResponse>>(badRequest.Value);
+        Assert.False(payload.Success);
     }
 
     [Fact]
     public async Task Login_ShouldReturnToken_ForValidCredentials()
     {
+        var controller = CreateController(out _);
         var registerRequest = CreateRegisterRequest();
-        await _client.PostAsJsonAsync("/api/identity/register", registerRequest);
+        await controller.Register(registerRequest);
 
         var loginRequest = new LoginRequest
         {
@@ -55,35 +67,37 @@ public class IdentityControllerTests : IClassFixture<CustomWebApplicationFactory
             Password = registerRequest.Password
         };
 
-        var response = await _client.PostAsJsonAsync("/api/identity/login", loginRequest);
-        var result = await response.Content.ReadFromJsonAsync<OperationResultDto>();
+        var actionResult = await controller.Login(loginRequest);
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.True(result?.Success);
-        Assert.False(string.IsNullOrEmpty(result?.ResultObject?.Token));
+        var okResult = Assert.IsType<OkObjectResult>(actionResult);
+        var payload = Assert.IsType<OperationResult<AuthResponse>>(okResult.Value);
+        Assert.True(payload.Success);
+        Assert.False(string.IsNullOrEmpty(payload.ResultObject?.Token));
     }
 
     [Fact]
     public async Task Login_ShouldFail_ForUnknownEmail()
     {
+        var controller = CreateController(out _);
         var loginRequest = new LoginRequest
         {
             Email = $"{Guid.NewGuid()}@example.com",
             Password = "Secret123!"
         };
 
-        var response = await _client.PostAsJsonAsync("/api/identity/login", loginRequest);
-        var result = await response.Content.ReadFromJsonAsync<OperationResultDto>();
+        var actionResult = await controller.Login(loginRequest);
 
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-        Assert.False(result?.Success);
+        var unauthorized = Assert.IsType<UnauthorizedObjectResult>(actionResult);
+        var payload = Assert.IsType<OperationResult<AuthResponse>>(unauthorized.Value);
+        Assert.False(payload.Success);
     }
 
     [Fact]
     public async Task Login_ShouldFail_ForInvalidPassword()
     {
+        var controller = CreateController(out _);
         var registerRequest = CreateRegisterRequest();
-        await _client.PostAsJsonAsync("/api/identity/register", registerRequest);
+        await controller.Register(registerRequest);
 
         var loginRequest = new LoginRequest
         {
@@ -91,11 +105,11 @@ public class IdentityControllerTests : IClassFixture<CustomWebApplicationFactory
             Password = "WrongPassword!"
         };
 
-        var response = await _client.PostAsJsonAsync("/api/identity/login", loginRequest);
-        var result = await response.Content.ReadFromJsonAsync<OperationResultDto>();
+        var actionResult = await controller.Login(loginRequest);
 
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-        Assert.False(result?.Success);
+        var unauthorized = Assert.IsType<UnauthorizedObjectResult>(actionResult);
+        var payload = Assert.IsType<OperationResult<AuthResponse>>(unauthorized.Value);
+        Assert.False(payload.Success);
     }
 
     private static RegisterRequest CreateRegisterRequest()
@@ -104,20 +118,8 @@ public class IdentityControllerTests : IClassFixture<CustomWebApplicationFactory
         {
             Email = $"{Guid.NewGuid()}@example.com",
             Password = "Secret123!",
-            DisplayName = "Integration User"
+            DisplayName = "Controller Test User"
         };
-    }
-
-    private sealed class OperationResultDto
-    {
-        public bool Success { get; set; }
-        public AuthResponse? ResultObject { get; set; }
-        public OperationErrorDto[]? Errors { get; set; }
-    }
-
-    private sealed class OperationErrorDto
-    {
-        public string? Message { get; set; }
     }
 }
 

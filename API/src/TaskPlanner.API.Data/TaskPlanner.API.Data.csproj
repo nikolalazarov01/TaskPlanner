@@ -8,6 +8,11 @@
 
   <ItemGroup>
     <PackageReference Include="MongoDB.Driver" Version="3.5.1" />
+    <PackageReference Include="OneBitSoftware.Utilities.OperationResult" Version="1.4.6" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TaskPlanner.API.Utilities\TaskPlanner.API.Utilities.csproj" />
   </ItemGroup>
 
 </Project>

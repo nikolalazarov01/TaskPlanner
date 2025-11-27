@@ -1,0 +1,90 @@
+# Build results
+bin/
+obj/
+
+# User-specific files
+*.user
+*.userosscache
+*.suo
+*.sln.docstates
+
+# Visual Studio working files
+.vs/
+
+# Rider / JetBrains
+.idea/
+*.sln.iml
+
+# Logs
+*.log
+
+# NuGet packages
+*.nupkg
+*.snupkg
+packages/
+*.nuget.props
+*.nuget.targets
+
+# Resharper
+_ReSharper*/
+*.[Rr]e[Ss]harper
+
+# Coverage
+*.coverage
+*.coveragexml
+
+# Publish outputs
+app.publish/
+
+# Azure functions
+local.settings.json
+
+# Dotnet tools
+.store/
+.tools/
+.dotnet/
+.paket/
+paket-files/
+
+# IDE backups
+*_i.c
+*_p.c
+*_h.h
+*.ipch
+*.aps
+*.ncb
+*.opendb
+*.opensdf
+*.sdf
+*.cachefile
+*.VC.db
+*.VC.VC.opendb
+
+# Node modules (if added later)
+node_modules/
+
+# Mac / Linux
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Test results
+TestResults/
+
+# Generated files
+*.g.*
+*.iobj
+*.ipdb
+
+# JetBrains Rider
+.idea/
+*.sln.iml
+
+# Rider plugin outputs
+/out/
+

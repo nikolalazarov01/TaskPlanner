@@ -2,6 +2,7 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using MongoDB.Driver;
+using TaskPlanner.API.Core.Configuration;
 using TaskPlanner.API.Core.Interfaces;
 using TaskPlanner.API.Core.Models;
 using TaskPlanner.API.Core.Services;
@@ -34,8 +35,7 @@ builder.Services.AddScoped<IMongoDatabase>(sp =>
     return client.GetDatabase(databaseName);
 });
 
-builder.Services.AddScoped<IUserRepository, UserRepository>();
-builder.Services.AddScoped<IIdentityService, IdentityService>();
+builder.Services.SetupServices();
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

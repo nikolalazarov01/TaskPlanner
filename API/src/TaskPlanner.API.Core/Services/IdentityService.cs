@@ -25,20 +25,15 @@ public class IdentityService : IIdentityService
         _jwtOptions = jwtOptions.Value;
     }
 
-    public async Task<OperationResult<AuthResponse>> RegisterAsync(RegisterRequest request)
+    public async Task<OperationResult> RegisterAsync(RegisterRequest request)
     {
-        var operationResult = new OperationResult<AuthResponse>();
+        var operationResult = new OperationResult();
         
         var existingUserResult = await _userRepository.GetByEmailAsync(request.Email);
 
-        if (!existingUserResult.Success)
+        if (!existingUserResult.Success || existingUserResult.ResultObject is not null)
         {
             return operationResult.AppendError("User already exists.");
-        }
-
-        if (existingUserResult.ResultObject is null)
-        {
-            return operationResult.AppendError("Something went wrong.");
         }
 
         var newUser = new User
@@ -54,9 +49,8 @@ public class IdentityService : IIdentityService
 
         var creationResult = await _userRepository.CreateAsync(newUser);
         if (!creationResult.Success) return operationResult.AppendErrors(creationResult);
-        
-        var token = GenerateJwtToken(newUser);
-        return operationResult.WithRelatedObject(AuthResponse.Succeeded(token));
+
+        return operationResult;
     }
 
     public async Task<OperationResult<AuthResponse>> LoginAsync(LoginRequest request)

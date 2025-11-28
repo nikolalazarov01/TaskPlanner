@@ -17,7 +17,7 @@ builder.Services.AddSwaggerGen();
 
 var jwtSection = builder.Configuration.GetSection("Jwt");
 var mongoSection = builder.Configuration.GetSection("MongoDb");
-var jwtSecret = jwtSection["Secret"] ?? "change-me";
+var jwtSecret = jwtSection["Secret"] ?? throw new InvalidOperationException("Jwt:Secret is missing from configuration.");
 
 builder.Services.Configure<JwtOptions>(jwtSection);
 

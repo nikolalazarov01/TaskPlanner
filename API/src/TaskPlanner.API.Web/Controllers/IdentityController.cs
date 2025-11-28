@@ -41,7 +41,7 @@ public class IdentityController : ControllerBase
             return BadRequest(result);
         }
 
-        return Ok(result);
+        return Ok();
     }
 }
 

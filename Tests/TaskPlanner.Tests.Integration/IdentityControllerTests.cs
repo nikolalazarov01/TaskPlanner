@@ -1,22 +1,29 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using OneBitSoftware.Utilities;
 using TaskPlanner.API.Core.Interfaces;
 using TaskPlanner.API.Core.Models;
 using TaskPlanner.API.Core.Services;
+using TaskPlanner.API.Data.Interfaces;
 using TaskPlanner.API.Web.Controllers;
-using Xunit;
 
-namespace TestPlanner.Tests.Integration;
+namespace TaskPlanner.Tests.Integration;
 
-public class IdentityControllerTests
+public class IdentityControllerTests : IClassFixture<Mongo2GoFixture>
 {
-    private IdentityController CreateController(out InMemoryUserRepository repository)
+    private readonly Mongo2GoFixture _mongoFixture;
+
+    public IdentityControllerTests(Mongo2GoFixture mongoFixture)
     {
-        repository = new InMemoryUserRepository();
+        _mongoFixture = mongoFixture;
+    }
+    
+    private IdentityController CreateController()
+    {
+        IUserRepository repository = new MongoUserRepository(_mongoFixture);
         var jwtOptions = Options.Create(new JwtOptions
         {
-            Secret = "replace-with-strong-secret",
+            Secret = "this_is_a_very_long_test_secret_key_123!",
             Issuer = "TaskPlanner",
             Audience = "TaskPlannerClients",
             ExpirationMinutes = 60
@@ -25,39 +32,36 @@ public class IdentityControllerTests
         IIdentityService identityService = new IdentityService(repository, jwtOptions);
         return new IdentityController(identityService);
     }
-
-    [Fact]
-    public async Task Register_ShouldReturnToken_ForNewUser()
+    
+    private static RegisterRequest CreateRegisterRequest()
     {
-        var controller = CreateController(out _);
-        var registerRequest = CreateRegisterRequest();
-
-        var actionResult = await controller.Register(registerRequest);
-
-        var okResult = Assert.IsType<OkObjectResult>(actionResult);
-        var payload = Assert.IsType<OperationResult<AuthResponse>>(okResult.Value);
-        Assert.True(payload.Success);
-        Assert.False(string.IsNullOrEmpty(payload.ResultObject?.Token));
+        return new RegisterRequest
+        {
+            Email = $"{Guid.NewGuid()}@example.com",
+            Password = "Secret123!",
+            DisplayName = "Controller Test User"
+        };
     }
-
+    
     [Fact]
     public async Task Register_ShouldFail_WhenEmailAlreadyUsed()
     {
-        var controller = CreateController(out _);
+        var controller = CreateController();
         var registerRequest = CreateRegisterRequest();
 
         await controller.Register(registerRequest);
         var duplicateResult = await controller.Register(registerRequest);
 
         var badRequest = Assert.IsType<BadRequestObjectResult>(duplicateResult);
-        var payload = Assert.IsType<OperationResult<AuthResponse>>(badRequest.Value);
+        var payload = Assert.IsType<OperationResult>(badRequest.Value);
         Assert.False(payload.Success);
     }
-
+    
+    
     [Fact]
     public async Task Login_ShouldReturnToken_ForValidCredentials()
     {
-        var controller = CreateController(out _);
+        var controller = CreateController();
         var registerRequest = CreateRegisterRequest();
         await controller.Register(registerRequest);
 
@@ -78,7 +82,7 @@ public class IdentityControllerTests
     [Fact]
     public async Task Login_ShouldFail_ForUnknownEmail()
     {
-        var controller = CreateController(out _);
+        var controller = CreateController();
         var loginRequest = new LoginRequest
         {
             Email = $"{Guid.NewGuid()}@example.com",
@@ -95,7 +99,7 @@ public class IdentityControllerTests
     [Fact]
     public async Task Login_ShouldFail_ForInvalidPassword()
     {
-        var controller = CreateController(out _);
+        var controller = CreateController();
         var registerRequest = CreateRegisterRequest();
         await controller.Register(registerRequest);
 
@@ -111,15 +115,4 @@ public class IdentityControllerTests
         var payload = Assert.IsType<OperationResult<AuthResponse>>(unauthorized.Value);
         Assert.False(payload.Success);
     }
-
-    private static RegisterRequest CreateRegisterRequest()
-    {
-        return new RegisterRequest
-        {
-            Email = $"{Guid.NewGuid()}@example.com",
-            Password = "Secret123!",
-            DisplayName = "Controller Test User"
-        };
-    }
 }
-

@@ -3,8 +3,6 @@ using OneBitSoftware.Utilities;
 using OneBitSoftware.Utilities.Errors;
 using TaskPlanner.API.Data.Interfaces;
 using TaskPlanner.API.Data.Models;
-using TaskPlanner.API.Utilities;
-using Task = System.Threading.Tasks.Task;
 
 namespace TaskPlanner.API.Data.Repositories;
 

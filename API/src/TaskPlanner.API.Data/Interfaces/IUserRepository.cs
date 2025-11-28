@@ -1,13 +1,10 @@
 using OneBitSoftware.Utilities;
 using TaskPlanner.API.Data.Models;
-using Task = System.Threading.Tasks.Task;
 
 namespace TaskPlanner.API.Data.Interfaces;
 
-public interface IUserRepository : IBaseRepository
+public interface IUserRepository : IBaseRepository<User>
 {
     Task<OperationResult<User>> GetByEmailAsync(string email);
-
-    Task<OperationResult> CreateAsync(User user);
 }
 

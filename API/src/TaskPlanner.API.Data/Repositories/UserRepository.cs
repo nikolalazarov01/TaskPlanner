@@ -3,6 +3,7 @@ using OneBitSoftware.Utilities;
 using OneBitSoftware.Utilities.Errors;
 using TaskPlanner.API.Data.Interfaces;
 using TaskPlanner.API.Data.Models;
+using TaskPlanner.API.Utilities;
 
 namespace TaskPlanner.API.Data.Repositories;
 
@@ -22,7 +23,7 @@ public class UserRepository : MongoDbRepositoryBase<User>, IUserRepository
         }
         catch (MongoWriteException e) when (e.WriteError is not null && e.WriteError.Category == ServerErrorCategory.DuplicateKey)
         {
-            var error = new OperationError(e.WriteError.Message);
+            var error = new DuplicateKeyError(e.WriteError.Message);
             operationResult.AppendError(error);
         }
 

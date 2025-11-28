@@ -5,8 +5,8 @@ namespace TaskPlanner.API.Core.Interfaces;
 
 public interface IIdentityService
 {
-    Task<OperationResult> RegisterAsync(RegisterRequest request);
+    Task<OperationResult> RegisterAsync(RegisterInputModel inputModel);
 
-    Task<OperationResult<AuthResponse>> LoginAsync(LoginRequest request);
+    Task<OperationResult<AuthResponse>> LoginAsync(LoginInputModel inputModel);
 }
 

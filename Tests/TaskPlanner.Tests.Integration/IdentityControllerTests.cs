@@ -33,9 +33,9 @@ public class IdentityControllerTests : IClassFixture<Mongo2GoFixture>
         return new IdentityController(identityService);
     }
     
-    private static RegisterRequest CreateRegisterRequest()
+    private static RegisterInputModel CreateRegisterRequest()
     {
-        return new RegisterRequest
+        return new RegisterInputModel
         {
             Email = $"{Guid.NewGuid()}@example.com",
             Password = "Secret123!",
@@ -57,6 +57,41 @@ public class IdentityControllerTests : IClassFixture<Mongo2GoFixture>
         Assert.False(payload.Success);
     }
     
+    [Fact]
+    public async Task Register_ShouldFail_WhenPasswordIsWeak()
+    {
+        var controller = CreateController();
+        var registerRequest = new RegisterInputModel
+        {
+            Email = $"{Guid.NewGuid()}@example.com",
+            Password = "weak-password",
+            DisplayName = "Controller Test User"
+        };
+        
+        var registerResult = await controller.Register(registerRequest);
+
+        var badRequest = Assert.IsType<BadRequestObjectResult>(registerResult);
+        var payload = Assert.IsType<OperationResult>(badRequest.Value);
+        Assert.False(payload.Success);
+    }
+    
+    [Fact]
+    public async Task Register_ShouldFail_WhenEmailIsNotCorrect()
+    {
+        var controller = CreateController();
+        var registerRequest = new RegisterInputModel
+        {
+            Email = $"{Guid.NewGuid()}example.com",
+            Password = "weak-password",
+            DisplayName = "Controller Test User"
+        };
+        
+        var registerResult = await controller.Register(registerRequest);
+
+        var badRequest = Assert.IsType<BadRequestObjectResult>(registerResult);
+        var payload = Assert.IsType<OperationResult>(badRequest.Value);
+        Assert.False(payload.Success);
+    }
     
     [Fact]
     public async Task Login_ShouldReturnToken_ForValidCredentials()
@@ -65,7 +100,7 @@ public class IdentityControllerTests : IClassFixture<Mongo2GoFixture>
         var registerRequest = CreateRegisterRequest();
         await controller.Register(registerRequest);
 
-        var loginRequest = new LoginRequest
+        var loginRequest = new LoginInputModel
         {
             Email = registerRequest.Email,
             Password = registerRequest.Password
@@ -83,7 +118,7 @@ public class IdentityControllerTests : IClassFixture<Mongo2GoFixture>
     public async Task Login_ShouldFail_ForUnknownEmail()
     {
         var controller = CreateController();
-        var loginRequest = new LoginRequest
+        var loginRequest = new LoginInputModel
         {
             Email = $"{Guid.NewGuid()}@example.com",
             Password = "Secret123!"
@@ -103,7 +138,7 @@ public class IdentityControllerTests : IClassFixture<Mongo2GoFixture>
         var registerRequest = CreateRegisterRequest();
         await controller.Register(registerRequest);
 
-        var loginRequest = new LoginRequest
+        var loginRequest = new LoginInputModel
         {
             Email = registerRequest.Email,
             Password = "WrongPassword!"
@@ -123,7 +158,7 @@ public class IdentityControllerTests : IClassFixture<Mongo2GoFixture>
         var registerRequest = CreateRegisterRequest();
         await controller.Register(registerRequest);
 
-        var loginRequest = new LoginRequest
+        var loginRequest = new LoginInputModel
         {
             Email = string.Empty,
             Password = string.Empty
@@ -141,13 +176,25 @@ public class IdentityControllerTests : IClassFixture<Mongo2GoFixture>
         var registerRequest = CreateRegisterRequest();
         await controller.Register(registerRequest);
 
-        var loginRequest = new LoginRequest
+        var loginRequest = new LoginInputModel
         {
             Email = null,
             Password = null
         };
 
         var actionResult = await controller.Login(loginRequest);
+
+        Assert.IsType<BadRequestResult>(actionResult);
+    }
+    
+    [Fact]
+    public async Task Login_ShouldFail_ForNullRequestInputModel()
+    {
+        var controller = CreateController();
+        var registerRequest = CreateRegisterRequest();
+        await controller.Register(registerRequest);
+
+        var actionResult = await controller.Login(null);
 
         Assert.IsType<BadRequestResult>(actionResult);
     }

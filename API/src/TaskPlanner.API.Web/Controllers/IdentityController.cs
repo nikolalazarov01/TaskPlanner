@@ -18,12 +18,12 @@ public class IdentityController : ControllerBase
 
     [AllowAnonymous]
     [HttpPost("login")]
-    public async Task<IActionResult> Login([FromBody] LoginRequest request)
+    public async Task<IActionResult> Login([FromBody] LoginInputModel inputModel)
     {
-        if (string.IsNullOrEmpty(request.Email) || string.IsNullOrWhiteSpace(request.Password))
+        if (inputModel is null || string.IsNullOrEmpty(inputModel.Email) || string.IsNullOrWhiteSpace(inputModel.Password))
             return BadRequest();
         
-        var result = await _identityService.LoginAsync(request);
+        var result = await _identityService.LoginAsync(inputModel);
 
         if (!result.Success)
         {
@@ -35,12 +35,13 @@ public class IdentityController : ControllerBase
 
     [AllowAnonymous]
     [HttpPost("register")]
-    public async Task<IActionResult> Register([FromBody] RegisterRequest request)
+    public async Task<IActionResult> Register([FromBody] RegisterInputModel inputModel)
     {
-        if (string.IsNullOrEmpty(request.Email) || string.IsNullOrWhiteSpace(request.Password) || string.IsNullOrWhiteSpace(request.DisplayName))
+        //TO-DO: Add password strength validation and email validation
+        if (inputModel is null || string.IsNullOrEmpty(inputModel.Email) || string.IsNullOrWhiteSpace(inputModel.Password) || string.IsNullOrWhiteSpace(inputModel.DisplayName))
             return BadRequest();
         
-        var result = await _identityService.RegisterAsync(request);
+        var result = await _identityService.RegisterAsync(inputModel);
 
         if (!result.Success)
         {

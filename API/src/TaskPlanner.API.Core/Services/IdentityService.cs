@@ -25,11 +25,11 @@ public class IdentityService : IIdentityService
         _jwtOptions = jwtOptions.Value;
     }
 
-    public async Task<OperationResult> RegisterAsync(RegisterRequest request)
+    public async Task<OperationResult> RegisterAsync(RegisterInputModel inputModel)
     {
         var operationResult = new OperationResult();
         
-        var existingUserResult = await _userRepository.GetByEmailAsync(request.Email);
+        var existingUserResult = await _userRepository.GetByEmailAsync(inputModel.Email);
 
         if (!existingUserResult.Success || existingUserResult.ResultObject is not null)
         {
@@ -39,9 +39,9 @@ public class IdentityService : IIdentityService
         var newUser = new User
         {
             Id = ObjectId.GenerateNewId(),
-            Email = request.Email,
-            DisplayName = request.DisplayName,
-            PasswordHash = HashPassword(request.Password),
+            Email = inputModel.Email,
+            DisplayName = inputModel.DisplayName,
+            PasswordHash = HashPassword(inputModel.Password),
             AuthProvider = "local",
             CreatedAt = DateTime.UtcNow,
             ExternalLogins = new List<string>()
@@ -53,11 +53,11 @@ public class IdentityService : IIdentityService
         return operationResult;
     }
 
-    public async Task<OperationResult<AuthResponse>> LoginAsync(LoginRequest request)
+    public async Task<OperationResult<AuthResponse>> LoginAsync(LoginInputModel inputModel)
     {
         var operationResult = new OperationResult<AuthResponse>();
         
-        var user = await _userRepository.GetByEmailAsync(request.Email);
+        var user = await _userRepository.GetByEmailAsync(inputModel.Email);
         if (!user.Success)
         {
             return operationResult.AppendErrors(user);
@@ -68,7 +68,7 @@ public class IdentityService : IIdentityService
             return operationResult.AppendError("Something went wrong");
         }
 
-        if (!VerifyPassword(request.Password, user.ResultObject.PasswordHash))
+        if (!VerifyPassword(inputModel.Password, user.ResultObject.PasswordHash))
         {
             return operationResult.AppendError("Invalid credentials.");
         }

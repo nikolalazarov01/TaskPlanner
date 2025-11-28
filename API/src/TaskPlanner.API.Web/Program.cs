@@ -8,6 +8,7 @@ using TaskPlanner.API.Core.Models;
 using TaskPlanner.API.Core.Services;
 using TaskPlanner.API.Data.Interfaces;
 using TaskPlanner.API.Data.Repositories;
+using TaskPlanner.API.Web.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -36,6 +37,7 @@ builder.Services.AddScoped<IMongoDatabase>(sp =>
 });
 
 builder.Services.SetupServices();
+builder.Services.SetupValidation();
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

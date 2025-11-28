@@ -1,3 +1,4 @@
+using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TaskPlanner.API.Core.Interfaces;
@@ -10,10 +11,14 @@ namespace TaskPlanner.API.Web.Controllers;
 public class IdentityController : ControllerBase
 {
     private readonly IIdentityService _identityService;
+    private readonly IValidator<RegisterInputModel> registerRequestValidator;
+    private readonly IValidator<LoginInputModel> loginRequestValidator;
 
-    public IdentityController(IIdentityService identityService)
+    public IdentityController(IIdentityService identityService, IValidator<RegisterInputModel> registerRequestValidator, IValidator<LoginInputModel> loginRequestValidator)
     {
-        _identityService = identityService;
+        this._identityService = identityService;
+        this.registerRequestValidator = registerRequestValidator;
+        this.loginRequestValidator = loginRequestValidator;
     }
 
     [AllowAnonymous]
@@ -40,6 +45,11 @@ public class IdentityController : ControllerBase
         //TO-DO: Add password strength validation and email validation
         if (inputModel is null || string.IsNullOrEmpty(inputModel.Email) || string.IsNullOrWhiteSpace(inputModel.Password) || string.IsNullOrWhiteSpace(inputModel.DisplayName))
             return BadRequest();
+        
+        var validationResult = await registerRequestValidator.ValidateAsync(inputModel);
+        
+        if (!validationResult.IsValid)
+            return BadRequest(validationResult);
         
         var result = await _identityService.RegisterAsync(inputModel);
 

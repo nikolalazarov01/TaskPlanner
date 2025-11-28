@@ -1,11 +1,15 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using FluentValidation;
+using FluentValidation.Results;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using Moq;
 using OneBitSoftware.Utilities;
 using TaskPlanner.API.Core.Interfaces;
 using TaskPlanner.API.Core.Models;
 using TaskPlanner.API.Core.Services;
 using TaskPlanner.API.Data.Interfaces;
 using TaskPlanner.API.Web.Controllers;
+using TaskPlanner.API.Web.Validation;
 
 namespace TaskPlanner.Tests.Integration;
 
@@ -21,6 +25,7 @@ public class IdentityControllerTests : IClassFixture<Mongo2GoFixture>
     private IdentityController CreateController()
     {
         IUserRepository repository = new MongoUserRepository(_mongoFixture);
+
         var jwtOptions = Options.Create(new JwtOptions
         {
             Secret = "this_is_a_very_long_test_secret_key_123!",
@@ -30,7 +35,11 @@ public class IdentityControllerTests : IClassFixture<Mongo2GoFixture>
         });
 
         IIdentityService identityService = new IdentityService(repository, jwtOptions);
-        return new IdentityController(identityService);
+
+        IValidator<RegisterInputModel> registerValidator = new UserRegisterValidator();
+        IValidator<LoginInputModel> loginValidator = new UserLoginValidator();
+
+        return new IdentityController(identityService, registerValidator, loginValidator);
     }
     
     private static RegisterInputModel CreateRegisterRequest()
@@ -71,26 +80,30 @@ public class IdentityControllerTests : IClassFixture<Mongo2GoFixture>
         var registerResult = await controller.Register(registerRequest);
 
         var badRequest = Assert.IsType<BadRequestObjectResult>(registerResult);
-        var payload = Assert.IsType<OperationResult>(badRequest.Value);
-        Assert.False(payload.Success);
+        var validationResult = Assert.IsType<ValidationResult>(badRequest.Value);
+        Assert.False(validationResult.IsValid);
+        Assert.Contains(validationResult.Errors, e => e.PropertyName == "Password");
     }
     
     [Fact]
     public async Task Register_ShouldFail_WhenEmailIsNotCorrect()
     {
+        // login validator can be the default "always valid"
         var controller = CreateController();
+        
         var registerRequest = new RegisterInputModel
         {
             Email = $"{Guid.NewGuid()}example.com",
-            Password = "weak-password",
+            Password = "StrongPassword1!",
             DisplayName = "Controller Test User"
         };
         
         var registerResult = await controller.Register(registerRequest);
 
         var badRequest = Assert.IsType<BadRequestObjectResult>(registerResult);
-        var payload = Assert.IsType<OperationResult>(badRequest.Value);
-        Assert.False(payload.Success);
+        var validationResult = Assert.IsType<ValidationResult>(badRequest.Value);
+        Assert.False(validationResult.IsValid);
+        Assert.Contains(validationResult.Errors, e => e.PropertyName == "Email");
     }
     
     [Fact]
@@ -198,4 +211,29 @@ public class IdentityControllerTests : IClassFixture<Mongo2GoFixture>
 
         Assert.IsType<BadRequestResult>(actionResult);
     }
+    
+    private static Mock<IValidator<RegisterInputModel>> GetValidRegisterValidatorMock()
+    {
+        var mock = new Mock<IValidator<RegisterInputModel>>();
+
+        mock.Setup(v => v.ValidateAsync(
+                It.IsAny<RegisterInputModel>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ValidationResult()); // no errors => IsValid == true
+
+        return mock;
+    }
+
+    private static Mock<IValidator<LoginInputModel>> GetValidLoginValidatorMock()
+    {
+        var mock = new Mock<IValidator<LoginInputModel>>();
+
+        mock.Setup(v => v.ValidateAsync(
+                It.IsAny<LoginInputModel>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new ValidationResult()); // no errors
+
+        return mock;
+    }
+
 }

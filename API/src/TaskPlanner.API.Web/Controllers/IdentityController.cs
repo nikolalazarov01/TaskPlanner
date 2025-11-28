@@ -20,6 +20,9 @@ public class IdentityController : ControllerBase
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
+        if (string.IsNullOrEmpty(request.Email) || string.IsNullOrWhiteSpace(request.Password))
+            return BadRequest();
+        
         var result = await _identityService.LoginAsync(request);
 
         if (!result.Success)
@@ -34,6 +37,9 @@ public class IdentityController : ControllerBase
     [HttpPost("register")]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
+        if (string.IsNullOrEmpty(request.Email) || string.IsNullOrWhiteSpace(request.Password) || string.IsNullOrWhiteSpace(request.DisplayName))
+            return BadRequest();
+        
         var result = await _identityService.RegisterAsync(request);
 
         if (!result.Success)

@@ -115,4 +115,40 @@ public class IdentityControllerTests : IClassFixture<Mongo2GoFixture>
         var payload = Assert.IsType<OperationResult<AuthResponse>>(unauthorized.Value);
         Assert.False(payload.Success);
     }
+    
+    [Fact]
+    public async Task Login_ShouldFail_ForEmptyValues()
+    {
+        var controller = CreateController();
+        var registerRequest = CreateRegisterRequest();
+        await controller.Register(registerRequest);
+
+        var loginRequest = new LoginRequest
+        {
+            Email = string.Empty,
+            Password = string.Empty
+        };
+
+        var actionResult = await controller.Login(loginRequest);
+
+        Assert.IsType<BadRequestResult>(actionResult);
+    }
+    
+    [Fact]
+    public async Task Login_ShouldFail_ForNullValues()
+    {
+        var controller = CreateController();
+        var registerRequest = CreateRegisterRequest();
+        await controller.Register(registerRequest);
+
+        var loginRequest = new LoginRequest
+        {
+            Email = null,
+            Password = null
+        };
+
+        var actionResult = await controller.Login(loginRequest);
+
+        Assert.IsType<BadRequestResult>(actionResult);
+    }
 }

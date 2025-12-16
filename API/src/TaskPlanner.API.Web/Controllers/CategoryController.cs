@@ -1,7 +1,11 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using TaskPlanner.API.Core.Interfaces;
+using TaskPlanner.API.Core.Models.Category;
 using TaskPlanner.API.Data.Models;
+using TaskPlanner.API.Web.Extensions;
 
 namespace TaskPlanner.API.Web.Controllers;
 
@@ -10,10 +14,24 @@ namespace TaskPlanner.API.Web.Controllers;
 [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
 public class CategoryController : ControllerBase
 {
-    [HttpPost]
-    public IActionResult Post([FromBody] Category category)
+    private readonly ICategoryService _categoryService;
+    
+    public CategoryController(ICategoryService categoryService)
     {
-        return StatusCode(StatusCodes.Status501NotImplemented);
+        _categoryService = categoryService;
+    }
+    
+    [HttpPost]
+    public async Task<IActionResult> Create([FromBody] CategoryInputModel category, CancellationToken cancellationToken)
+    {
+        //Use built in validation methods
+        if (category is null || string.IsNullOrWhiteSpace(category.Name)) return BadRequest();
+
+        if (!this.TryGetUserObjectId(out var userId)) return Unauthorized();
+        
+        var create = await this._categoryService.CreateCategory(category, userId, cancellationToken);
+        
+        return Ok();
     }
 
     [HttpPut]

@@ -6,10 +6,10 @@ using TaskPlanner.API.Utilities;
 
 namespace TaskPlanner.API.Data.Repositories;
 
-public abstract class MongoDbRepositoryBase<TEntity> : IBaseRepository<TEntity>
+public class MongoDbRepositoryBase<TEntity> : IBaseRepository<TEntity>
     where TEntity : IEntity
 {
-    protected MongoDbRepositoryBase(IMongoDatabase database, string collectionName)
+    public MongoDbRepositoryBase(IMongoDatabase database, string collectionName)
     {
         Database = database ?? throw new ArgumentNullException(nameof(database));
 

@@ -4,11 +4,8 @@ using TaskPlanner.API.Data.Interfaces;
 
 namespace TaskPlanner.API.Data.Models;
 
-public class User : IEntity
+public class User : BaseEntity
 {
-    [BsonId]
-    [BsonRepresentation(BsonType.ObjectId)]
-    public ObjectId Id { get; set; }
 
     [BsonElement("email")]
     public string Email { get; set; } = string.Empty;

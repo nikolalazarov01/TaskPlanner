@@ -1,4 +1,4 @@
-namespace TaskPlanner.API.Core.Models;
+namespace TaskPlanner.API.Core.Models.Identity;
 
 public class RegisterInputModel
 {

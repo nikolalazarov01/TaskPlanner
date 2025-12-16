@@ -2,7 +2,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TaskPlanner.API.Core.Interfaces;
-using TaskPlanner.API.Core.Models;
+using TaskPlanner.API.Core.Models.Identity;
 
 namespace TaskPlanner.API.Web.Controllers;
 

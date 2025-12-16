@@ -1,5 +1,6 @@
 using OneBitSoftware.Utilities;
 using TaskPlanner.API.Core.Models;
+using TaskPlanner.API.Core.Models.Identity;
 
 namespace TaskPlanner.API.Core.Interfaces;
 

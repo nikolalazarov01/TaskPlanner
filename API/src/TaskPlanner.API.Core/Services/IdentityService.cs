@@ -6,9 +6,8 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using MongoDB.Bson;
 using OneBitSoftware.Utilities;
-using OneBitSoftware.Utilities.Errors;
 using TaskPlanner.API.Core.Interfaces;
-using TaskPlanner.API.Core.Models;
+using TaskPlanner.API.Core.Models.Identity;
 using TaskPlanner.API.Data.Interfaces;
 using TaskPlanner.API.Data.Models;
 

@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TaskPlanner.API.Core.Interfaces;
 using TaskPlanner.API.Core.Models.Category;
-using TaskPlanner.API.Data.Models;
 using TaskPlanner.API.Web.Extensions;
 
 namespace TaskPlanner.API.Web.Controllers;
@@ -17,13 +16,15 @@ public class CategoryController : ControllerBase
 {
     private readonly ICategoryService _categoryService;
     private readonly IValidator<CategoryInputModel> _categoryRequestValidator;
+    private readonly IValidator<UpdateCategoryInputModel> _updateCategoryRequestValidator;
     private readonly IMapper _mapper;
     
-    public CategoryController(ICategoryService categoryService, IValidator<CategoryInputModel> categoryRequestValidator, IMapper mapper)
+    public CategoryController(ICategoryService categoryService, IValidator<CategoryInputModel> categoryRequestValidator, IValidator<UpdateCategoryInputModel> updateCategoryRequestValidator, IMapper mapper)
     {
         _categoryService = categoryService;
-        this._categoryRequestValidator = categoryRequestValidator;
+        _categoryRequestValidator = categoryRequestValidator;
         _mapper = mapper;
+        _updateCategoryRequestValidator = updateCategoryRequestValidator;
     }
     
     [HttpPost]
@@ -46,10 +47,25 @@ public class CategoryController : ControllerBase
         return Ok(response);
     }
 
-    [HttpPut]
-    public IActionResult Put([FromBody] Category category)
+    [HttpPatch]
+    public async Task<IActionResult> Update([FromBody] UpdateCategoryInputModel category, CancellationToken cancellationToken)
     {
-        return StatusCode(StatusCodes.Status501NotImplemented);
+        if (category is null || string.IsNullOrWhiteSpace(category.Id)) return BadRequest();
+
+        var validation = await this._updateCategoryRequestValidator.ValidateAsync(category, cancellationToken);
+        if (!validation.IsValid) return BadRequest(validation.Errors);
+
+        if (!this.TryGetUserObjectId(out var userId))
+            return Unauthorized();
+
+        var updateResult = await _categoryService.UpdateCategory(category, userId, cancellationToken);
+
+        if (!updateResult.Success) return BadRequest(updateResult.Errors);
+        var updatedEntity = updateResult.ResultObject;
+        if (updatedEntity is null) return NotFound();
+
+        var response = _mapper.Map<CategoryResponseModel>(updatedEntity);
+        return Ok(response);
     }
 
     [HttpGet]

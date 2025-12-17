@@ -8,4 +8,6 @@ namespace TaskPlanner.API.Core.Interfaces;
 public interface ICategoryService
 {
     Task<OperationResult<Category>> CreateCategory(CategoryInputModel category, ObjectId userId, CancellationToken cancellationToken);
+
+    Task<OperationResult<Category>> UpdateCategory(UpdateCategoryInputModel input, ObjectId userId, CancellationToken cancellationToken);
 }

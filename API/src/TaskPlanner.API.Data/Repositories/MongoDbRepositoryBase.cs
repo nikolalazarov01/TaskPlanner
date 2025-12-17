@@ -42,7 +42,7 @@ public class MongoDbRepositoryBase<TEntity> : IBaseRepository<TEntity>
         return operationResult.WithRelatedObject(entity);
     }
     
-    public async Task<OperationResult<TEntity>> UpdateAsync(TEntity entity)
+    public async Task<OperationResult<TEntity>> UpdateAsync(TEntity entity, CancellationToken cancellationToken, UpdateDefinition<TEntity> update = null)
     {
         var result = new OperationResult<TEntity>();
 
@@ -50,19 +50,21 @@ public class MongoDbRepositoryBase<TEntity> : IBaseRepository<TEntity>
         {
             var filter = Builders<TEntity>.Filter.Eq(e => e.Id, entity.Id);
 
-            var options = new ReplaceOptions
+            var options = new FindOneAndUpdateOptions<TEntity>
             {
-                IsUpsert = false
+                IsUpsert = false,
+                ReturnDocument = ReturnDocument.After
             };
 
-            var replaceResult = await Collection.ReplaceOneAsync(filter, entity, options);
+            var updatedEntity = await Collection.FindOneAndUpdateAsync(filter, update, options, cancellationToken);
 
-            if (replaceResult.MatchedCount == 0)
+            if (updatedEntity is null)
             {
-                result.AppendError(new OperationError(
-                    $"Entity with id '{entity.Id}' was not found."));
+                result.AppendError("Entity not found.");
                 return result;
             }
+            
+            return result.WithRelatedObject(updatedEntity);
         }
         catch (MongoWriteException e) when
             (e.WriteError?.Category == ServerErrorCategory.DuplicateKey)
@@ -70,8 +72,6 @@ public class MongoDbRepositoryBase<TEntity> : IBaseRepository<TEntity>
             result.AppendError(new DuplicateKeyError(e.WriteError.Message));
             return result;
         }
-
-        return result.WithRelatedObject(entity);
     }
 }
 

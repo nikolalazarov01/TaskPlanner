@@ -9,8 +9,11 @@ using TaskPlanner.API.Core.Models;
 using TaskPlanner.API.Core.Models.Identity;
 using TaskPlanner.API.Core.Services;
 using TaskPlanner.API.Data.Interfaces;
+using TaskPlanner.API.Data.Models;
+using TaskPlanner.API.Data.Repositories;
 using TaskPlanner.API.Web.Controllers;
 using TaskPlanner.API.Web.Validation;
+using Task = System.Threading.Tasks.Task;
 
 namespace TaskPlanner.Tests.Integration;
 
@@ -25,7 +28,7 @@ public class IdentityControllerTests : IClassFixture<Mongo2GoFixture>
     
     private IdentityController CreateController()
     {
-        IUserRepository repository = new MongoUserRepository(_mongoFixture);
+        var repository = new UserRepository(_mongoFixture.Database);
 
         var jwtOptions = Options.Create(new JwtOptions
         {
@@ -123,9 +126,9 @@ public class IdentityControllerTests : IClassFixture<Mongo2GoFixture>
         var actionResult = await controller.Login(loginRequest);
 
         var okResult = Assert.IsType<OkObjectResult>(actionResult);
-        var payload = Assert.IsType<OperationResult<AuthResponse>>(okResult.Value);
+        var payload = Assert.IsType<AuthResponse>(okResult.Value);
         Assert.True(payload.Success);
-        Assert.False(string.IsNullOrEmpty(payload.ResultObject?.Token));
+        Assert.False(string.IsNullOrEmpty(payload.Token));
     }
 
     [Fact]
@@ -161,8 +164,8 @@ public class IdentityControllerTests : IClassFixture<Mongo2GoFixture>
         var actionResult = await controller.Login(loginRequest);
 
         var unauthorized = Assert.IsType<UnauthorizedObjectResult>(actionResult);
-        var payload = Assert.IsType<OperationResult<AuthResponse>>(unauthorized.Value);
-        Assert.False(payload.Success);
+        var payload = Assert.IsType<ValidationResult>(unauthorized.Value);
+        Assert.False(payload.IsValid);
     }
     
     [Fact]

@@ -1,5 +1,6 @@
 using MongoDB.Driver;
 using OneBitSoftware.Utilities;
+using OneBitSoftware.Utilities.Errors;
 using TaskPlanner.API.Data.Interfaces;
 using TaskPlanner.API.Data.Models;
 using TaskPlanner.API.Utilities;
@@ -39,6 +40,38 @@ public class MongoDbRepositoryBase<TEntity> : IBaseRepository<TEntity>
         }
 
         return operationResult.WithRelatedObject(entity);
+    }
+    
+    public async Task<OperationResult<TEntity>> UpdateAsync(TEntity entity)
+    {
+        var result = new OperationResult<TEntity>();
+
+        try
+        {
+            var filter = Builders<TEntity>.Filter.Eq(e => e.Id, entity.Id);
+
+            var options = new ReplaceOptions
+            {
+                IsUpsert = false
+            };
+
+            var replaceResult = await Collection.ReplaceOneAsync(filter, entity, options);
+
+            if (replaceResult.MatchedCount == 0)
+            {
+                result.AppendError(new OperationError(
+                    $"Entity with id '{entity.Id}' was not found."));
+                return result;
+            }
+        }
+        catch (MongoWriteException e) when
+            (e.WriteError?.Category == ServerErrorCategory.DuplicateKey)
+        {
+            result.AppendError(new DuplicateKeyError(e.WriteError.Message));
+            return result;
+        }
+
+        return result.WithRelatedObject(entity);
     }
 }
 

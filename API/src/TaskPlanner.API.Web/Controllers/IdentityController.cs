@@ -29,16 +29,16 @@ public class IdentityController : ControllerBase
             return BadRequest();
         
         var loginValidation = await this.loginRequestValidator.ValidateAsync(inputModel);
-        if (!loginValidation.IsValid) return BadRequest(loginValidation);
+        if (!loginValidation.IsValid) return Unauthorized(loginValidation);
         
         var result = await _identityService.LoginAsync(inputModel);
 
-        if (!result.Success)
-        {
-            return Unauthorized(result);
-        }
+        if (!result.Success) return Unauthorized(result);
+        
+        var loginResponse = result.ResultObject;
+        if (loginResponse is null) return NotFound();
 
-        return Ok(result);
+        return Ok(loginResponse);
     }
 
     [AllowAnonymous]

@@ -4,6 +4,7 @@ using TaskPlanner.API.Core.Interfaces;
 using TaskPlanner.API.Core.Models.Category;
 using TaskPlanner.API.Data.Interfaces;
 using TaskPlanner.API.Data.Models;
+using TaskPlanner.API.Utilities.Constants;
 
 namespace TaskPlanner.API.Core.Services;
 
@@ -16,14 +17,13 @@ public class CategoryService : ICategoryService
         _repository = repository;
     }
     
-    public async Task<OperationResult> CreateCategory(CategoryInputModel category, ObjectId userId, CancellationToken cancellationToken)
+    public async Task<OperationResult<Category>> CreateCategory(CategoryInputModel category, ObjectId userId, CancellationToken cancellationToken)
     {
-        //Add constants class with default values
         var categoryEntity = new Category()
         {
             Name = category.Name,
-            Color = category.Color ?? "Default",
-            SortOrder = category.SortOrder ?? -1,
+            Color = category.Color ?? ApiConstants.CategoryConstants.DefaultColor,
+            SortOrder = category.SortOrder ?? ApiConstants.CategoryConstants.DefaultSortOrder,
             UserId = userId,
             CreatedAt = DateTime.Now,
         };

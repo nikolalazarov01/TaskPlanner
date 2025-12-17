@@ -28,6 +28,9 @@ public class IdentityController : ControllerBase
         if (inputModel is null || string.IsNullOrEmpty(inputModel.Email) || string.IsNullOrWhiteSpace(inputModel.Password))
             return BadRequest();
         
+        var loginValidation = await this.loginRequestValidator.ValidateAsync(inputModel);
+        if (!loginValidation.IsValid) return BadRequest(loginValidation);
+        
         var result = await _identityService.LoginAsync(inputModel);
 
         if (!result.Success)

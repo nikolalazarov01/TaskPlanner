@@ -40,6 +40,8 @@ builder.Services.AddScoped<IMongoDatabase>(sp =>
 builder.Services.SetupServices();
 builder.Services.SetupValidation();
 
+builder.Services.AddAutoMapper(typeof(Program));
+
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>

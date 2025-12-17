@@ -5,6 +5,6 @@ namespace TaskPlanner.API.Data.Interfaces;
 
 public interface IBaseRepository<TEntity> where TEntity : IEntity
 {
-    Task<OperationResult> CreateAsync(TEntity entity);
+    Task<OperationResult<TEntity>> CreateAsync(TEntity entity);
 }
 

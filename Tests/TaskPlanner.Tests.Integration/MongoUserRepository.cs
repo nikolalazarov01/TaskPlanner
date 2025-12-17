@@ -38,9 +38,9 @@ public class MongoUserRepository : IUserRepository
         return result;
     }
 
-    public async Task<OperationResult> CreateAsync(User user)
+    public async Task<OperationResult<User>> CreateAsync(User user)
     {
-        var result = new OperationResult();
+        var result = new OperationResult<User>();
 
         // Keep the same "User already exists" semantics as your in-memory version
         var existing = await _users

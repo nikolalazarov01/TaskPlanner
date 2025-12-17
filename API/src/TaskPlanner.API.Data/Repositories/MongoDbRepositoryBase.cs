@@ -25,9 +25,9 @@ public class MongoDbRepositoryBase<TEntity> : IBaseRepository<TEntity>
 
     protected IMongoCollection<TEntity> Collection { get; }
     
-    public async Task<OperationResult> CreateAsync(TEntity entity)
+    public async Task<OperationResult<TEntity>> CreateAsync(TEntity entity)
     {
-        var operationResult = new OperationResult();
+        var operationResult = new OperationResult<TEntity>();
         try
         {
             await Collection.InsertOneAsync(entity);
@@ -38,7 +38,7 @@ public class MongoDbRepositoryBase<TEntity> : IBaseRepository<TEntity>
             operationResult.AppendError(error);
         }
 
-        return operationResult;
+        return operationResult.WithRelatedObject(entity);
     }
 }
 

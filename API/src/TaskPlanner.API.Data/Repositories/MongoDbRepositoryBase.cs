@@ -134,5 +134,57 @@ public class MongoDbRepositoryBase<TEntity> : IBaseRepository<TEntity>
             return result;
         }
     }
+    
+    public async Task<OperationResult<TEntity>> DeleteOneAsync(FilterDefinition<TEntity> filter, CancellationToken cancellationToken)
+    {
+        var result = new OperationResult<TEntity>();
+
+        try
+        {
+            filter ??= Builders<TEntity>.Filter.Empty;
+
+            // Return deleted entity (useful for controller/service mapping)
+            var deleted = await Collection.FindOneAndDeleteAsync(filter, cancellationToken: cancellationToken);
+
+            if (deleted is null)
+            {
+                result.AppendError(new NotFoundError("Entity not found."));
+                return result;
+            }
+
+            return result.WithRelatedObject(deleted);
+        }
+        catch (Exception ex)
+        {
+            result.AppendError(ex.Message);
+            return result;
+        }
+    }
+
+    public async Task<OperationResult<long>> DeleteManyAsync(FilterDefinition<TEntity> filter, CancellationToken cancellationToken)
+    {
+        var result = new OperationResult<long>();
+
+        try
+        {
+            filter ??= Builders<TEntity>.Filter.Empty;
+
+            var deleteResult = await Collection.DeleteManyAsync(filter, cancellationToken);
+
+            // If you want "not found" semantics when nothing was deleted:
+            if (deleteResult.DeletedCount == 0)
+            {
+                result.AppendError(new NotFoundError("No entities found to delete."));
+                return result;
+            }
+
+            return result.WithRelatedObject(deleteResult.DeletedCount);
+        }
+        catch (Exception ex)
+        {
+            result.AppendError(ex.Message);
+            return result;
+        }
+    }
 }
 

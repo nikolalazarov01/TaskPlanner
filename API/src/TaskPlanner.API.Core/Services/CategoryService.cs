@@ -85,4 +85,29 @@ public class CategoryService : ICategoryService
 
         return await _repository.GetAsync(filter: filter, sort: sort, skip: null, limit: null, cancellationToken: cancellationToken);
     }
+    
+    public async Task<OperationResult<Category>> DeleteCategory(string categoryId, ObjectId userId, CancellationToken cancellationToken)
+    {
+        var result = new OperationResult<Category>();
+
+        if (!ObjectId.TryParse(categoryId, out var id))
+        {
+            result.AppendError("Invalid category id.");
+            return result;
+        }
+
+        var filter = Builders<Category>.Filter.And(
+            Builders<Category>.Filter.Eq(x => x.Id, id),
+            Builders<Category>.Filter.Eq(x => x.UserId, userId)
+        );
+
+        return await _repository.DeleteOneAsync(filter, cancellationToken);
+    }
+    
+    public async Task<OperationResult<long>> DeleteCategories(ObjectId userId, CancellationToken cancellationToken)
+    {
+        var filter = Builders<Category>.Filter.Eq(x => x.UserId, userId);
+
+        return await _repository.DeleteManyAsync(filter, cancellationToken);
+    }
 }

@@ -111,10 +111,47 @@ public class CategoryController : ControllerBase
         return Ok(response);
     }
 
-    [HttpDelete]
-    public IActionResult Delete([FromQuery] string entityId)
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> DeleteOne([FromRoute] string id, CancellationToken cancellationToken)
     {
-        return StatusCode(StatusCodes.Status501NotImplemented);
+        if (string.IsNullOrWhiteSpace(id)) return BadRequest();
+
+        if (!this.TryGetUserObjectId(out var userId)) return Unauthorized();
+
+        var deleteResult = await _categoryService.DeleteCategory(id, userId, cancellationToken);
+
+        if (!deleteResult.Success)
+        {
+            if (deleteResult.Errors.Any(e => e is NotFoundError))
+                return NotFound(deleteResult.Errors);
+
+            return BadRequest(deleteResult.Errors);
+        }
+
+        var deleted = deleteResult.ResultObject;
+        if (deleted is null) return NotFound();
+
+        var response = _mapper.Map<CategoryResponseModel>(deleted);
+        return Ok(response);
+    }
+
+    [HttpDelete]
+    public async Task<IActionResult> DeleteMany(CancellationToken cancellationToken)
+    {
+        if (!this.TryGetUserObjectId(out var userId)) return Unauthorized();
+
+        var deleteResult = await _categoryService.DeleteCategories(userId, cancellationToken);
+
+        if (!deleteResult.Success)
+        {
+            if (deleteResult.Errors.Any(e => e is NotFoundError))
+                return NotFound(deleteResult.Errors);
+
+            return BadRequest(deleteResult.Errors);
+        }
+
+        // returns deleted count
+        return Ok(new { deletedCount = deleteResult.ResultObject });
     }
 }
 

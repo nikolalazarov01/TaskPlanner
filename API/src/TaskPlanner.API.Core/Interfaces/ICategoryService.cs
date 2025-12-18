@@ -14,4 +14,8 @@ public interface ICategoryService
     Task<OperationResult<Category>> GetCategoryById(string categoryId, ObjectId userId, CancellationToken cancellationToken);
 
     Task<OperationResult<IReadOnlyList<Category>>> GetCategories(ObjectId userId, CancellationToken cancellationToken);
+
+    Task<OperationResult<Category>> DeleteCategory(string categoryId, ObjectId userId, CancellationToken cancellationToken);
+    
+    Task<OperationResult<long>> DeleteCategories(ObjectId userId, CancellationToken cancellationToken);
 }

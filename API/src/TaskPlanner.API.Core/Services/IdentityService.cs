@@ -14,6 +14,7 @@ using TaskPlanner.API.Data.Models;
 
 namespace TaskPlanner.API.Core.Services;
 
+/// <inheritdoc/>
 public class IdentityService : IIdentityService
 {
     private readonly IBaseRepository<User> _userRepository;
@@ -25,6 +26,7 @@ public class IdentityService : IIdentityService
         _jwtOptions = jwtOptions.Value;
     }
 
+    /// <inheritdoc/>
     public async Task<OperationResult> RegisterAsync(RegisterInputModel inputModel)
     {
         var operationResult = new OperationResult();
@@ -55,6 +57,7 @@ public class IdentityService : IIdentityService
         return operationResult;
     }
 
+    /// <inheritdoc/>
     public async Task<OperationResult<AuthResponse>> LoginAsync(LoginInputModel inputModel)
     {
         var operationResult = new OperationResult<AuthResponse>();

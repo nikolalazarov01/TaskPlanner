@@ -1,12 +1,11 @@
 using MongoDB.Driver;
 using OneBitSoftware.Utilities;
-using OneBitSoftware.Utilities.Errors;
 using TaskPlanner.API.Data.Interfaces;
-using TaskPlanner.API.Data.Models;
 using TaskPlanner.API.Utilities;
 
 namespace TaskPlanner.API.Data.Repositories;
 
+/// <inheritdoc/>
 public class MongoDbRepositoryBase<TEntity> : IBaseRepository<TEntity>
     where TEntity : IEntity
 {
@@ -26,6 +25,7 @@ public class MongoDbRepositoryBase<TEntity> : IBaseRepository<TEntity>
 
     protected IMongoCollection<TEntity> Collection { get; }
     
+    /// <inheritdoc/>
     public async Task<OperationResult<TEntity>> CreateAsync(TEntity entity)
     {
         var operationResult = new OperationResult<TEntity>();
@@ -42,6 +42,7 @@ public class MongoDbRepositoryBase<TEntity> : IBaseRepository<TEntity>
         return operationResult.WithRelatedObject(entity);
     }
     
+    /// <inheritdoc/>
     public async Task<OperationResult<TEntity>> ModifyAsync(TEntity entity, CancellationToken cancellationToken, UpdateDefinition<TEntity> update = null)
     {
         var result = new OperationResult<TEntity>();
@@ -74,6 +75,7 @@ public class MongoDbRepositoryBase<TEntity> : IBaseRepository<TEntity>
         }
     }
     
+    /// <inheritdoc/>
     public async Task<OperationResult<IReadOnlyList<TEntity>>> GetAsync(FilterDefinition<TEntity> filter, CancellationToken cancellationToken, SortDefinition<TEntity>? sort = null, int? skip = null, int? limit = null)
     {
         var result = new OperationResult<IReadOnlyList<TEntity>>();
@@ -110,6 +112,7 @@ public class MongoDbRepositoryBase<TEntity> : IBaseRepository<TEntity>
         }
     }
     
+    /// <inheritdoc/>
     public async Task<OperationResult<TEntity>> GetOneAsync(FilterDefinition<TEntity> filter, CancellationToken cancellationToken)
     {
         var result = new OperationResult<TEntity>();
@@ -135,6 +138,7 @@ public class MongoDbRepositoryBase<TEntity> : IBaseRepository<TEntity>
         }
     }
     
+    /// <inheritdoc/>
     public async Task<OperationResult<TEntity>> DeleteOneAsync(FilterDefinition<TEntity> filter, CancellationToken cancellationToken)
     {
         var result = new OperationResult<TEntity>();
@@ -161,6 +165,7 @@ public class MongoDbRepositoryBase<TEntity> : IBaseRepository<TEntity>
         }
     }
 
+    /// <inheritdoc/>
     public async Task<OperationResult<long>> DeleteManyAsync(FilterDefinition<TEntity> filter, CancellationToken cancellationToken)
     {
         var result = new OperationResult<long>();

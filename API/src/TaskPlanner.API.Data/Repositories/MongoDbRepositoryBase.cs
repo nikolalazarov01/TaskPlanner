@@ -42,7 +42,7 @@ public class MongoDbRepositoryBase<TEntity> : IBaseRepository<TEntity>
         return operationResult.WithRelatedObject(entity);
     }
     
-    public async Task<OperationResult<TEntity>> UpdateAsync(TEntity entity, CancellationToken cancellationToken, UpdateDefinition<TEntity> update = null)
+    public async Task<OperationResult<TEntity>> ModifyAsync(TEntity entity, CancellationToken cancellationToken, UpdateDefinition<TEntity> update = null)
     {
         var result = new OperationResult<TEntity>();
 
@@ -70,6 +70,67 @@ public class MongoDbRepositoryBase<TEntity> : IBaseRepository<TEntity>
             (e.WriteError?.Category == ServerErrorCategory.DuplicateKey)
         {
             result.AppendError(new DuplicateKeyError(e.WriteError.Message));
+            return result;
+        }
+    }
+    
+    public async Task<OperationResult<IReadOnlyList<TEntity>>> GetAsync(FilterDefinition<TEntity> filter, CancellationToken cancellationToken, SortDefinition<TEntity>? sort = null, int? skip = null, int? limit = null)
+    {
+        var result = new OperationResult<IReadOnlyList<TEntity>>();
+
+        try
+        {
+            filter ??= Builders<TEntity>.Filter.Empty;
+
+            var query = Collection.Find(filter);
+
+            if (sort is not null)
+            {
+                query = query.Sort(sort);
+            }
+
+            if (skip.HasValue)
+            {
+                query = query.Skip(skip.Value);
+            }
+
+            if (limit.HasValue)
+            {
+                query = query.Limit(limit.Value);
+            }
+
+            var entities = await query.ToListAsync(cancellationToken);
+
+            return result.WithRelatedObject(entities);
+        }
+        catch (Exception ex)
+        {
+            result.AppendError(ex.Message);
+            return result;
+        }
+    }
+    
+    public async Task<OperationResult<TEntity>> GetOneAsync(FilterDefinition<TEntity> filter, CancellationToken cancellationToken)
+    {
+        var result = new OperationResult<TEntity>();
+
+        try
+        {
+            filter ??= Builders<TEntity>.Filter.Empty;
+
+            var entity = await Collection.Find(filter).FirstOrDefaultAsync(cancellationToken);
+
+            if (entity is null)
+            {
+                result.AppendError(new NotFoundError("Entity not found."));
+                return result;
+            }
+
+            return result.WithRelatedObject(entity);
+        }
+        catch (Exception ex)
+        {
+            result.AppendError(ex.Message);
             return result;
         }
     }

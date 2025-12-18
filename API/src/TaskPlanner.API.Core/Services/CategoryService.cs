@@ -61,9 +61,28 @@ public class CategoryService : ICategoryService
 
         var update = Builders<Category>.Update.Combine(updates);
 
-        return await _repository.UpdateAsync(
+        return await _repository.ModifyAsync(
             entity: new Category { Id = categoryId }, // only Id is used by repository
             cancellationToken: cancellationToken,
             update: update);
+    }
+    
+    public async Task<OperationResult<Category>> GetCategoryById(string categoryId, ObjectId userId, CancellationToken cancellationToken)
+    {
+        var filter = Builders<Category>.Filter.And(
+            Builders<Category>.Filter.Eq(x => x.Id, new ObjectId(categoryId)),
+            Builders<Category>.Filter.Eq(x => x.UserId, userId)
+        );
+
+        return await _repository.GetOneAsync(filter, cancellationToken);
+    }
+
+    public async Task<OperationResult<IReadOnlyList<Category>>> GetCategories(ObjectId userId, CancellationToken cancellationToken)
+    {
+        var filter = Builders<Category>.Filter.Eq(x => x.UserId, userId);
+
+        var sort = Builders<Category>.Sort.Ascending(x => x.SortOrder).Ascending(x => x.CreatedAt);
+
+        return await _repository.GetAsync(filter: filter, sort: sort, skip: null, limit: null, cancellationToken: cancellationToken);
     }
 }

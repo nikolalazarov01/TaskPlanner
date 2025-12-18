@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TaskPlanner.API.Core.Interfaces;
 using TaskPlanner.API.Core.Models.Category;
+using TaskPlanner.API.Data.Models;
+using TaskPlanner.API.Utilities;
 using TaskPlanner.API.Web.Extensions;
 
 namespace TaskPlanner.API.Web.Controllers;
@@ -68,10 +70,45 @@ public class CategoryController : ControllerBase
         return Ok(response);
     }
 
-    [HttpGet]
-    public IActionResult Get([FromQuery] string entityId)
+    [HttpGet("{id}")]
+    public async Task<IActionResult> GetOne([FromRoute] string id, CancellationToken cancellationToken)
     {
-        return StatusCode(StatusCodes.Status501NotImplemented);
+        if (string.IsNullOrWhiteSpace(id)) return BadRequest();
+
+        if (!this.TryGetUserObjectId(out var userId)) return Unauthorized();
+
+        var getResult = await _categoryService.GetCategoryById(id, userId, cancellationToken);
+
+        if (!getResult.Success)
+        {
+            if (getResult.Errors.Any(e => e is NotFoundError)) return NotFound();
+            return BadRequest(getResult.Errors);
+        }
+
+        var entity = getResult.ResultObject;
+        if (entity is null) return NotFound();
+
+        var response = _mapper.Map<CategoryResponseModel>(entity);
+        return Ok(response);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> GetMany(CancellationToken cancellationToken)
+    {
+        if (!this.TryGetUserObjectId(out var userId)) return Unauthorized();
+
+        var getResult = await _categoryService.GetCategories(userId, cancellationToken);
+
+        if (!getResult.Success)
+        {
+            if (getResult.Errors.Any(e => e is NotFoundError)) return NotFound(getResult.Errors);
+            return BadRequest(getResult.Errors);
+        }
+
+        var entities = getResult.ResultObject ?? Array.Empty<Category>();
+
+        var response = _mapper.Map<List<CategoryResponseModel>>(entities);
+        return Ok(response);
     }
 
     [HttpDelete]

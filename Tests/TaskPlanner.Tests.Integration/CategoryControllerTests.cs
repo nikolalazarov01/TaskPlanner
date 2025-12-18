@@ -269,5 +269,101 @@ public class CategoryControllerTests : IClassFixture<Mongo2GoFixture>
         var badRequest = Assert.IsType<BadRequestObjectResult>(result);
         Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
     }
+    
+    [Fact]
+    public async Task GetOne_ShouldReturn_BadRequest_When_Id_Is_NullOrWhitespace()
+    {
+        var controller = CreateAuthenticatedController();
+    
+        var result = await controller.GetOne("", CancellationToken.None);
+    
+        var badRequest = Assert.IsType<BadRequestResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
+    }
+    
+    [Fact]
+    public async Task GetOne_ShouldReturn_NotFound_When_Category_Does_Not_Exist_For_User()
+    {
+        var controller = CreateAuthenticatedController();
+    
+        var result = await controller.GetOne(ObjectId.GenerateNewId().ToString(), CancellationToken.None);
+    
+        var notFound = Assert.IsType<NotFoundResult>(result);
+        Assert.Equal(StatusCodes.Status404NotFound, notFound.StatusCode);
+    }
+    
+    [Fact]
+    public async Task GetOne_ShouldReturn_Ok_With_CategoryResponseModel_When_Found()
+    {
+        var controller = CreateAuthenticatedController();
+    
+        // create first
+        var createResult = await controller.Create(new CategoryInputModel { Name = "Work" }, CancellationToken.None);
+        var created = Assert.IsType<OkObjectResult>(createResult).Value as CategoryResponseModel;
+        Assert.NotNull(created);
+    
+        var result = await controller.GetOne(created!.Id.ToString(), CancellationToken.None);
+    
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(StatusCodes.Status200OK, ok.StatusCode);
+    
+        var response = Assert.IsType<CategoryResponseModel>(ok.Value);
+        Assert.Equal(created.Id, response.Id);
+        Assert.Equal(created.Name, response.Name);
+        Assert.Equal(created.Color, response.Color);
+        Assert.Equal(created.SortOrder, response.SortOrder);
+    }
+    
+    [Fact]
+    public async Task GetMany_ShouldReturn_Ok_With_Empty_List_When_No_Categories()
+    {
+        var controller = CreateAuthenticatedController();
+    
+        var result = await controller.GetMany(CancellationToken.None);
+    
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(StatusCodes.Status200OK, ok.StatusCode);
+    
+        var list = Assert.IsAssignableFrom<List<CategoryResponseModel>>(ok.Value);
+        Assert.Empty(list);
+    }
+    
+    [Fact]
+    public async Task GetMany_ShouldReturn_Ok_With_List_When_Categories_Exist()
+    {
+        var controller = CreateAuthenticatedController();
+    
+        await controller.Create(new CategoryInputModel { Name = "Work" }, CancellationToken.None);
+        await controller.Create(new CategoryInputModel { Name = "Personal" }, CancellationToken.None);
+    
+        var result = await controller.GetMany(CancellationToken.None);
+    
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(StatusCodes.Status200OK, ok.StatusCode);
+    
+        var list = Assert.IsAssignableFrom<List<CategoryResponseModel>>(ok.Value);
+        Assert.Equal(2, list.Count);
+        Assert.Contains(list, x => x.Name == "Work");
+        Assert.Contains(list, x => x.Name == "Personal");
+    }
+    
+    [Fact]
+    public async Task GetOne_ShouldReturn_NotFound_When_Category_Belongs_To_Different_User()
+    {
+        // Controller with user A creates category
+        var controllerA = CreateAuthenticatedController();
+    
+        var createResult = await controllerA.Create(new CategoryInputModel { Name = "Work" }, CancellationToken.None);
+        var created = Assert.IsType<OkObjectResult>(createResult).Value as CategoryResponseModel;
+        Assert.NotNull(created);
+    
+        // Controller with user B tries to fetch same category
+        var controllerB = CreateAuthenticatedController();
+    
+        var result = await controllerB.GetOne(created!.Id.ToString(), CancellationToken.None);
+    
+        var notFound = Assert.IsType<NotFoundResult>(result);
+        Assert.Equal(StatusCodes.Status404NotFound, notFound.StatusCode);
+    }
 }
 

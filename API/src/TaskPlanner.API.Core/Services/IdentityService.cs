@@ -5,33 +5,37 @@ using System.Text;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using MongoDB.Bson;
+using MongoDB.Driver;
 using OneBitSoftware.Utilities;
-using OneBitSoftware.Utilities.Errors;
 using TaskPlanner.API.Core.Interfaces;
-using TaskPlanner.API.Core.Models;
+using TaskPlanner.API.Core.Models.Identity;
 using TaskPlanner.API.Data.Interfaces;
 using TaskPlanner.API.Data.Models;
 
 namespace TaskPlanner.API.Core.Services;
 
+/// <inheritdoc/>
 public class IdentityService : IIdentityService
 {
-    private readonly IUserRepository _userRepository;
+    private readonly IBaseRepository<User> _userRepository;
     private readonly JwtOptions _jwtOptions;
 
-    public IdentityService(IUserRepository userRepository, IOptions<JwtOptions> jwtOptions)
+    public IdentityService(IBaseRepository<User> userRepository, IOptions<JwtOptions> jwtOptions)
     {
         _userRepository = userRepository;
         _jwtOptions = jwtOptions.Value;
     }
 
+    /// <inheritdoc/>
     public async Task<OperationResult> RegisterAsync(RegisterInputModel inputModel)
     {
         var operationResult = new OperationResult();
         
-        var existingUserResult = await _userRepository.GetByEmailAsync(inputModel.Email);
+        var filter = Builders<User>.Filter.Eq(u => u.Email, inputModel.Email);
 
-        if (!existingUserResult.Success || existingUserResult.ResultObject is not null)
+        var existingUserResult = await _userRepository.GetOneAsync(filter, CancellationToken.None);
+
+        if (existingUserResult.Success || existingUserResult.ResultObject is not null)
         {
             return operationResult.AppendError("User already exists.");
         }
@@ -53,29 +57,32 @@ public class IdentityService : IIdentityService
         return operationResult;
     }
 
+    /// <inheritdoc/>
     public async Task<OperationResult<AuthResponse>> LoginAsync(LoginInputModel inputModel)
     {
         var operationResult = new OperationResult<AuthResponse>();
         
-        var user = await _userRepository.GetByEmailAsync(inputModel.Email);
-        if (!user.Success)
+        var filter = Builders<User>.Filter.Eq(u => u.Email, inputModel.Email);
+
+        var getUser = await _userRepository.GetOneAsync(filter, CancellationToken.None);
+        if (!getUser.Success)
         {
-            return operationResult.AppendErrors(user);
+            return operationResult.AppendErrors(getUser);
         }
 
-        if (user.ResultObject is null)
+        if (getUser.ResultObject is null)
         {
             return operationResult.AppendError("Something went wrong");
         }
 
-        if (!VerifyPassword(inputModel.Password, user.ResultObject.PasswordHash))
+        if (!VerifyPassword(inputModel.Password, getUser.ResultObject.PasswordHash))
         {
             return operationResult.AppendError("Invalid credentials.");
         }
 
-        user.ResultObject.LastLoginAt = DateTime.UtcNow;
+        getUser.ResultObject.LastLoginAt = DateTime.UtcNow;
 
-        var token = GenerateJwtToken(user.ResultObject);
+        var token = GenerateJwtToken(getUser.ResultObject);
         return operationResult.WithRelatedObject(AuthResponse.Succeeded(token));
     }
 

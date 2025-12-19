@@ -5,6 +5,7 @@ using MongoDB.Driver;
 using TaskPlanner.API.Core.Configuration;
 using TaskPlanner.API.Core.Interfaces;
 using TaskPlanner.API.Core.Models;
+using TaskPlanner.API.Core.Models.Identity;
 using TaskPlanner.API.Core.Services;
 using TaskPlanner.API.Data.Interfaces;
 using TaskPlanner.API.Data.Repositories;
@@ -38,6 +39,8 @@ builder.Services.AddScoped<IMongoDatabase>(sp =>
 
 builder.Services.SetupServices();
 builder.Services.SetupValidation();
+
+builder.Services.AddAutoMapper(typeof(Program));
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

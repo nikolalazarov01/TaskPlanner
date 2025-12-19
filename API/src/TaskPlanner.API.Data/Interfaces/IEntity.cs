@@ -8,7 +8,7 @@ namespace TaskPlanner.API.Data.Interfaces;
 public interface IEntity
 {
     /// <summary>
-    /// The unique id of the entity
+    /// The unique Id of the entity
     /// </summary>
     ObjectId Id { get; set; }
 }

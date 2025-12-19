@@ -19,13 +19,13 @@ jobs:
           dotnet-version: 9.0.x
 
       - name: Restore
-        run: dotnet restore TaskPlanner/TaskPlanner.sln
+        run: dotnet restore TaskPlanner.sln
 
       - name: Build
-        run: dotnet build TaskPlanner/TaskPlanner.sln --configuration Release --no-restore
+        run: dotnet build TaskPlanner.sln --configuration Release --no-restore
 
       - name: Unit tests
-        run: dotnet test TaskPlanner/Tests/TaskPlanner.Tests.Unit/TaskPlanner.Tests.Unit.csproj --configuration Release --no-build --verbosity normal
+        run: dotnet test Tests/TaskPlanner.Tests.Unit/TaskPlanner.Tests.Unit.csproj --configuration Release --no-build --verbosity normal
 
       - name: Integration tests
-        run: dotnet test TaskPlanner/Tests/TaskPlanner.Tests.Integration/TaskPlanner.Tests.Integration.csproj --configuration Release --no-build --verbosity normal
+        run: dotnet test Tests/TaskPlanner.Tests.Integration/TaskPlanner.Tests.Integration.csproj --configuration Release --no-build --verbosity normal

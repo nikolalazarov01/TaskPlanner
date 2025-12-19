@@ -2,9 +2,9 @@ name: .NET CI
 
 on:
   push:
-    branches: [ "nikola/create-ci-pipeline" ]
+    branches: [ "dev" ]
   pull_request:
-    branches: [ "nikola/create-ci-pipeline" ]
+    branches: [ "dev" ]
 
 jobs:
   build-and-test:

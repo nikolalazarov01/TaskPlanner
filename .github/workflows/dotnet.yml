@@ -1,0 +1,31 @@
+name: .NET CI
+
+on:
+  push:
+    branches: [ "dev" ]
+  pull_request:
+    branches: [ "dev" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Restore
+        run: dotnet restore TaskPlanner/TaskPlanner.sln
+
+      - name: Build
+        run: dotnet build TaskPlanner/TaskPlanner.sln --configuration Release --no-restore
+
+      - name: Unit tests
+        run: dotnet test TaskPlanner/Tests/TaskPlanner.Tests.Unit/TaskPlanner.Tests.Unit.csproj --configuration Release --no-build --verbosity normal
+
+      - name: Integration tests
+        run: dotnet test TaskPlanner/Tests/TaskPlanner.Tests.Integration/TaskPlanner.Tests.Integration.csproj --configuration Release --no-build --verbosity normal

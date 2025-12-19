@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using AutoMapper;
+using FluentValidation.Results;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -11,6 +12,7 @@ using TaskPlanner.API.Data.Models;
 using TaskPlanner.API.Data.Repositories;
 using TaskPlanner.API.Web.Controllers;
 using TaskPlanner.API.Web.Mapping;
+using TaskPlanner.API.Web.Validation;
 using Task = System.Threading.Tasks.Task;
 using TaskEntity = TaskPlanner.API.Data.Models.Task;
 using TaskStatus = TaskPlanner.API.Data.Models.TaskStatus;
@@ -47,7 +49,10 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         mapperConfig.AssertConfigurationIsValid();
         IMapper mapper = mapperConfig.CreateMapper();
 
-        var controller = new TaskController(service, mapper);
+        var createValidator = new TaskValidator();
+        var updateValidator = new UpdateTaskValidator();
+
+        var controller = new TaskController(service, mapper, createValidator, updateValidator);
 
         userId = ObjectId.GenerateNewId();
         var claims = new[]
@@ -78,7 +83,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
             builder.AddDebug();
             builder.AddConsole();
         });
-        
+
         var mapperConfig = new MapperConfiguration(cfg =>
         {
             cfg.AddProfile<TaskMappingProfile>();
@@ -87,7 +92,10 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         mapperConfig.AssertConfigurationIsValid();
         IMapper mapper = mapperConfig.CreateMapper();
 
-        var controller = new TaskController(service, mapper);
+        var createValidator = new TaskValidator();
+        var updateValidator = new UpdateTaskValidator();
+
+        var controller = new TaskController(service, mapper, createValidator, updateValidator);
 
         controller.ControllerContext = new ControllerContext
         {
@@ -118,6 +126,28 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         return category;
     }
 
+    private async Task<TaskEntity> InsertTaskAsync(ObjectId userId, ObjectId categoryId, ObjectId taskId, CancellationToken cancellationToken)
+    {
+        var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
+
+        var entity = new TaskEntity
+        {
+            Id = taskId,
+            UserId = userId,
+            CategoryId = categoryId,
+            Description = "Seed task",
+            Priority = TaskPriority.Medium,
+            Status = TaskStatus.Todo,
+            EstimatedMinutes = 10,
+            Deadline = DateTime.UtcNow.AddDays(3),
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        await taskRepository.CreateAsync(entity);
+        return entity;
+    }
+
     [Fact]
     public async Task Create_ShouldReturn_BadRequest_When_InputModel_Is_Null()
     {
@@ -130,14 +160,17 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
     }
 
     [Fact]
-    public async Task Create_ShouldReturn_BadRequest_When_Description_Is_NullOrWhitespace()
+    public async Task Create_ShouldReturn_BadRequestObject_When_Description_Is_NullOrWhitespace()
     {
         var controller = CreateAuthenticatedController(out _);
 
         var result = await controller.Create(new CreateTaskInputModel { Description = " " }, ObjectId.GenerateNewId().ToString(), CancellationToken.None);
 
-        var badRequest = Assert.IsType<BadRequestResult>(result);
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result);
         Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
+
+        var errors = Assert.IsAssignableFrom<List<ValidationFailure>>(badRequest.Value);
+        Assert.Contains(errors, e => e.PropertyName == nameof(CreateTaskInputModel.Description));
     }
 
     [Fact]
@@ -174,6 +207,84 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
     }
 
     [Fact]
+    public async Task Create_ShouldReturn_BadRequest_When_Description_Exceeds_50_Characters()
+    {
+        var controller = CreateAuthenticatedController(out var userId);
+
+        var categoryId = ObjectId.GenerateNewId();
+        await InsertCategoryAsync(userId, categoryId, CancellationToken.None);
+
+        var longDescription = new string('a', 51);
+
+        var result = await controller.Create(
+            new CreateTaskInputModel
+            {
+                Description = longDescription,
+                Priority = TaskPriority.Medium
+            },
+            categoryId.ToString(),
+            CancellationToken.None);
+
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
+
+        var errors = Assert.IsAssignableFrom<List<ValidationFailure>>(badRequest.Value);
+        Assert.Contains(errors, e => e.PropertyName == "Description");
+    }
+
+    [Fact]
+    public async Task Create_ShouldReturn_BadRequest_When_Deadline_Is_In_The_Past()
+    {
+        var controller = CreateAuthenticatedController(out var userId);
+
+        var categoryId = ObjectId.GenerateNewId();
+        await InsertCategoryAsync(userId, categoryId, CancellationToken.None);
+
+        var pastDeadline = DateTime.UtcNow.AddMinutes(-1);
+
+        var result = await controller.Create(
+            new CreateTaskInputModel
+            {
+                Description = "Valid",
+                Priority = TaskPriority.Medium,
+                Deadline = pastDeadline
+            },
+            categoryId.ToString(),
+            CancellationToken.None);
+
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
+
+        var errors = Assert.IsAssignableFrom<List<ValidationFailure>>(badRequest.Value);
+        Assert.Contains(errors, e => e.PropertyName == "Deadline");
+    }
+
+    [Fact]
+    public async Task Create_ShouldReturn_BadRequest_When_EstimatedMinutes_Is_Negative()
+    {
+        var controller = CreateAuthenticatedController(out var userId);
+
+        var categoryId = ObjectId.GenerateNewId();
+        await InsertCategoryAsync(userId, categoryId, CancellationToken.None);
+
+        var result = await controller.Create(
+            new CreateTaskInputModel
+            {
+                Description = "Valid",
+                Priority = TaskPriority.Medium,
+                EstimatedMinutes = -1
+            },
+            categoryId.ToString(),
+            CancellationToken.None);
+
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
+
+        var errors = Assert.IsAssignableFrom<List<ValidationFailure>>(badRequest.Value);
+        Assert.Contains(errors, e => e.PropertyName == "EstimatedMinutes");
+    }
+    
+    [Fact]
     public async Task Create_ShouldReturn_BadRequest_When_Category_Does_Not_Exist_For_User()
     {
         var controller = CreateAuthenticatedController(out var userId);
@@ -188,7 +299,6 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         var badRequest = Assert.IsType<BadRequestObjectResult>(result);
         Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
 
-        // Also verify that nothing was created in DB
         var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
         var filter = Builders<TaskEntity>.Filter.Eq(x => x.UserId, userId);
         var get = await taskRepository.GetAsync(filter, CancellationToken.None);
@@ -226,9 +336,11 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         Assert.Equal("My task", response.Description);
         Assert.Equal(TaskPriority.High, response.Priority);
         Assert.Equal(45, response.EstimatedMinutes);
-        Assert.Equal(deadline, response.Deadline);
 
-        // Verify persisted entity, including the business rule: default status is Todo on creation
+        Assert.NotNull(response.Deadline);
+        var diffResp = (response.Deadline.Value - deadline).Duration();
+        Assert.True(diffResp < TimeSpan.FromMilliseconds(1), $"Deadline differs by {diffResp.TotalMilliseconds} ms");
+
         var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
         var filter = Builders<TaskEntity>.Filter.And(
             Builders<TaskEntity>.Filter.Eq(x => x.UserId, userId),
@@ -245,10 +357,11 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         Assert.Equal(TaskPriority.High, created.Priority);
         Assert.Equal(TaskStatus.Todo, created.Status);
         Assert.Equal(45, created.EstimatedMinutes);
-        Assert.NotNull(created.Deadline);
 
-        var diff = (created.Deadline.Value - deadline).Duration();
-        Assert.True(diff < TimeSpan.FromMilliseconds(1), $"Deadline differs by {diff.TotalMilliseconds} ms");
+        Assert.NotNull(created.Deadline);
+        var diffDb = (created.Deadline.Value - deadline).Duration();
+        Assert.True(diffDb < TimeSpan.FromMilliseconds(1), $"Deadline differs by {diffDb.TotalMilliseconds} ms");
+
         Assert.Equal(userId, created.UserId);
         Assert.Equal(categoryId, created.CategoryId);
         Assert.NotEqual(default, created.CreatedAt);
@@ -276,22 +389,311 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         var badRequest = Assert.IsType<BadRequestObjectResult>(result);
         Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
 
-        // Verify no task was created for userB
         var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
+
         var filterB = Builders<TaskEntity>.Filter.Eq(x => x.UserId, userB);
         var getB = await taskRepository.GetAsync(filterB, CancellationToken.None);
-
         Assert.True(getB.Success);
         Assert.Empty(getB.ResultObject);
 
-        // Verify no task was created under userA's category either
         var filterAinCat = Builders<TaskEntity>.Filter.And(
             Builders<TaskEntity>.Filter.Eq(x => x.UserId, userA),
             Builders<TaskEntity>.Filter.Eq(x => x.CategoryId, categoryIdOfA)
         );
         var getA = await taskRepository.GetAsync(filterAinCat, CancellationToken.None);
-
         Assert.True(getA.Success);
         Assert.Empty(getA.ResultObject);
+    }
+
+    [Fact]
+    public async Task Update_ShouldReturn_BadRequest_When_Description_Exceeds_50_Characters()
+    {
+        var controller = CreateAuthenticatedController(out var userId);
+
+        var categoryId = ObjectId.GenerateNewId();
+        await InsertCategoryAsync(userId, categoryId, CancellationToken.None);
+
+        var taskId = ObjectId.GenerateNewId();
+        await InsertTaskAsync(userId, categoryId, taskId, CancellationToken.None);
+
+        var longDescription = new string('a', 51);
+
+        var result = await controller.Update(
+            new UpdateTaskInputModel
+            {
+                Id = taskId.ToString(),
+                CategoryId = categoryId.ToString(),
+                Description = longDescription,
+                Deadline = DateTime.UtcNow.AddDays(1),
+                Priority = TaskPriority.Medium,
+                Status = TaskStatus.Todo,
+                EstimatedMinutes = 10
+            },
+            CancellationToken.None);
+
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
+
+        var errors = Assert.IsAssignableFrom<List<ValidationFailure>>(badRequest.Value);
+        Assert.Contains(errors, e => e.PropertyName == "Description");
+    }
+
+    [Fact]
+    public async Task Update_ShouldReturn_BadRequest_When_Deadline_Is_In_The_Past()
+    {
+        var controller = CreateAuthenticatedController(out var userId);
+
+        var categoryId = ObjectId.GenerateNewId();
+        await InsertCategoryAsync(userId, categoryId, CancellationToken.None);
+
+        var taskId = ObjectId.GenerateNewId();
+        await InsertTaskAsync(userId, categoryId, taskId, CancellationToken.None);
+
+        var pastDeadline = DateTime.UtcNow.AddMinutes(-1);
+
+        var result = await controller.Update(
+            new UpdateTaskInputModel
+            {
+                Id = taskId.ToString(),
+                CategoryId = categoryId.ToString(),
+                Description = "Valid",
+                Deadline = pastDeadline,
+                Priority = TaskPriority.Medium,
+                Status = TaskStatus.Todo,
+                EstimatedMinutes = 10
+            },
+            CancellationToken.None);
+
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
+
+        var errors = Assert.IsAssignableFrom<List<ValidationFailure>>(badRequest.Value);
+        Assert.Contains(errors, e => e.PropertyName == "Deadline");
+    }
+
+    [Fact]
+    public async Task Update_ShouldReturn_BadRequest_When_EstimatedMinutes_Is_Negative()
+    {
+        var controller = CreateAuthenticatedController(out var userId);
+
+        var categoryId = ObjectId.GenerateNewId();
+        await InsertCategoryAsync(userId, categoryId, CancellationToken.None);
+
+        var taskId = ObjectId.GenerateNewId();
+        await InsertTaskAsync(userId, categoryId, taskId, CancellationToken.None);
+
+        var result = await controller.Update(
+            new UpdateTaskInputModel
+            {
+                Id = taskId.ToString(),
+                CategoryId = categoryId.ToString(),
+                Description = "Valid",
+                Deadline = DateTime.UtcNow.AddDays(1),
+                Priority = TaskPriority.Medium,
+                Status = TaskStatus.Todo,
+                EstimatedMinutes = -1
+            },
+            CancellationToken.None);
+
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
+
+        var errors = Assert.IsAssignableFrom<List<ValidationFailure>>(badRequest.Value);
+        Assert.Contains(errors, e => e.PropertyName == "EstimatedMinutes");
+    }
+    
+    [Fact]
+    public async Task Update_ShouldReturn_BadRequest_When_InputModel_Is_Null()
+    {
+        var controller = CreateAuthenticatedController(out _);
+
+        var result = await controller.Update(null, CancellationToken.None);
+
+        var badRequest = Assert.IsType<BadRequestResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
+    }
+
+    [Fact]
+    public async Task Update_ShouldReturn_BadRequestObject_When_Id_Is_Invalid()
+    {
+        var controller = CreateAuthenticatedController(out _);
+
+        var result = await controller.Update(
+            new UpdateTaskInputModel
+            {
+                Id = "not-an-object-id",
+                CategoryId = ObjectId.GenerateNewId().ToString(),
+                Description = "Valid"
+            },
+            CancellationToken.None);
+
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
+
+        var errors = Assert.IsAssignableFrom<List<ValidationFailure>>(badRequest.Value);
+        Assert.Contains(errors, e => e.PropertyName == nameof(UpdateTaskInputModel.Id));
+    }
+
+    [Fact]
+    public async Task Update_ShouldReturn_BadRequestObject_When_CategoryId_Is_Invalid()
+    {
+        var controller = CreateAuthenticatedController(out _);
+
+        var result = await controller.Update(
+            new UpdateTaskInputModel
+            {
+                Id = ObjectId.GenerateNewId().ToString(),
+                CategoryId = "not-an-object-id",
+                Description = "Valid"
+            },
+            CancellationToken.None);
+
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
+
+        var errors = Assert.IsAssignableFrom<List<ValidationFailure>>(badRequest.Value);
+        Assert.Contains(errors, e => e.PropertyName == nameof(UpdateTaskInputModel.CategoryId));
+    }
+
+    [Fact]
+    public async Task Update_ShouldReturn_Unauthorized_When_User_Is_Not_Authenticated()
+    {
+        var controller = CreateUnauthenticatedController();
+
+        var result = await controller.Update(
+            new UpdateTaskInputModel
+            {
+                Id = ObjectId.GenerateNewId().ToString(),
+                CategoryId = ObjectId.GenerateNewId().ToString(),
+                Description = "Update"
+            },
+            CancellationToken.None);
+
+        var unauthorized = Assert.IsType<UnauthorizedResult>(result);
+        Assert.Equal(StatusCodes.Status401Unauthorized, unauthorized.StatusCode);
+    }
+
+    [Fact]
+    public async Task Update_ShouldReturn_NotFound_When_Task_Does_Not_Exist_For_User()
+    {
+        var controller = CreateAuthenticatedController(out var userId);
+
+        var categoryId = ObjectId.GenerateNewId();
+        await InsertCategoryAsync(userId, categoryId, CancellationToken.None);
+
+        var result = await controller.Update(
+            new UpdateTaskInputModel
+            {
+                Id = ObjectId.GenerateNewId().ToString(),
+                CategoryId = categoryId.ToString(),
+                Description = "Update",
+                Priority = TaskPriority.High,
+                Status = TaskStatus.InProgress,
+                EstimatedMinutes = 20,
+                Deadline = DateTime.UtcNow.AddDays(1)
+            },
+            CancellationToken.None);
+
+        var notFound = Assert.IsType<NotFoundObjectResult>(result);
+        Assert.Equal(StatusCodes.Status404NotFound, notFound.StatusCode);
+    }
+
+    [Fact]
+    public async Task Update_ShouldUpdate_Task_ForUser_And_Return_ResponseModel()
+    {
+        var controller = CreateAuthenticatedController(out var userId);
+
+        var categoryId = ObjectId.GenerateNewId();
+        await InsertCategoryAsync(userId, categoryId, CancellationToken.None);
+
+        var taskId = ObjectId.GenerateNewId();
+        var seed = await InsertTaskAsync(userId, categoryId, taskId, CancellationToken.None);
+
+        var newDeadline = DateTime.UtcNow.AddDays(5);
+
+        var result = await controller.Update(
+            new UpdateTaskInputModel
+            {
+                Id = taskId.ToString(),
+                CategoryId = categoryId.ToString(),
+                Description = "Updated task",
+                Deadline = newDeadline,
+                Priority = TaskPriority.High,
+                Status = TaskStatus.Done,
+                EstimatedMinutes = 120
+            },
+            CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(StatusCodes.Status200OK, ok.StatusCode);
+
+        var response = Assert.IsType<TaskResponseModel>(ok.Value);
+        Assert.Equal(taskId.ToString(), response.Id);
+        Assert.Equal(userId.ToString(), response.UserId);
+        Assert.Equal(categoryId.ToString(), response.CategoryId);
+        Assert.Equal("Updated task", response.Description);
+        Assert.Equal(TaskPriority.High, response.Priority);
+        Assert.Equal(120, response.EstimatedMinutes);
+
+        Assert.NotNull(response.Deadline);
+        var diffResp = (response.Deadline.Value - newDeadline).Duration();
+        Assert.True(diffResp < TimeSpan.FromMilliseconds(1), $"Deadline differs by {diffResp.TotalMilliseconds} ms");
+
+        var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
+        var get = await taskRepository.GetOneAsync(Builders<TaskEntity>.Filter.Eq(x => x.Id, taskId), CancellationToken.None);
+        Assert.True(get.Success);
+        Assert.NotNull(get.ResultObject);
+
+        var updated = get.ResultObject!;
+        Assert.Equal(userId, updated.UserId);
+        Assert.Equal(categoryId, updated.CategoryId);
+        Assert.Equal("Updated task", updated.Description);
+        Assert.Equal(TaskPriority.High, updated.Priority);
+        Assert.Equal(TaskStatus.Done, updated.Status);
+        Assert.Equal(120, updated.EstimatedMinutes);
+
+        Assert.NotNull(updated.Deadline);
+        var diffDb = (updated.Deadline.Value - newDeadline).Duration();
+        Assert.True(diffDb < TimeSpan.FromMilliseconds(1), $"Deadline differs by {diffDb.TotalMilliseconds} ms");
+
+        var createdAtDiff = (updated.CreatedAt - seed.CreatedAt).Duration();
+        Assert.True(createdAtDiff < TimeSpan.FromMilliseconds(1), $"CreatedAt differs by {createdAtDiff.TotalMilliseconds} ms");
+
+        Assert.NotNull(updated.UpdatedAt);
+        Assert.True(updated.UpdatedAt.Value >= seed.UpdatedAt!.Value);
+    }
+
+    [Fact]
+    public async Task Update_ShouldReturn_NotFound_When_Task_Belongs_To_Different_User()
+    {
+        var controllerA = CreateAuthenticatedController(out var userA);
+        var controllerB = CreateAuthenticatedController(out var userB);
+
+        var categoryA = ObjectId.GenerateNewId();
+        await InsertCategoryAsync(userA, categoryA, CancellationToken.None);
+
+        var taskId = ObjectId.GenerateNewId();
+        await InsertTaskAsync(userA, categoryA, taskId, CancellationToken.None);
+
+        var result = await controllerB.Update(
+            new UpdateTaskInputModel
+            {
+                Id = taskId.ToString(),
+                CategoryId = categoryA.ToString(),
+                Description = "Attempted update",
+                Priority = TaskPriority.High,
+                Status = TaskStatus.InProgress
+            },
+            CancellationToken.None);
+
+        var notFound = Assert.IsType<NotFoundObjectResult>(result);
+        Assert.Equal(StatusCodes.Status404NotFound, notFound.StatusCode);
+
+        var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
+        var get = await taskRepository.GetOneAsync(Builders<TaskEntity>.Filter.Eq(x => x.Id, taskId), CancellationToken.None);
+        Assert.True(get.Success);
+        Assert.NotNull(get.ResultObject);
+        Assert.Equal(userA, get.ResultObject!.UserId);
+        Assert.Equal("Seed task", get.ResultObject.Description);
     }
 }

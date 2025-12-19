@@ -17,6 +17,16 @@ public interface IBaseRepository<TEntity> where TEntity : IEntity
     Task<OperationResult<TEntity>> CreateAsync(TEntity entity);
     
     /// <summary>
+    /// A method, used to update (replace) an entire entity in the database
+    /// </summary>
+    /// <param name="entity">The entity containing the updated state</param>
+    /// <param name="cancellationToken">An instance of <see cref="CancellationToken"/></param>
+    /// <returns>
+    /// <see cref="OperationResult"/> with result object containing the updated entity
+    /// </returns>
+    Task<OperationResult<TEntity>> UpdateAsync(TEntity entity, CancellationToken cancellationToken);
+    
+    /// <summary>
     /// A method, used for modifying an entity
     /// </summary>
     /// <param name="entity">The entity, being modified</param>

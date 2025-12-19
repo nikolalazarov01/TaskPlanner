@@ -1,4 +1,5 @@
 using AutoMapper;
+using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -17,12 +18,16 @@ namespace TaskPlanner.API.Web.Controllers;
 public class TaskController : ControllerBase
 {
     private readonly ITaskService _taskService;
+    private readonly IValidator<CreateTaskInputModel> _createTaskRequestValidator;
+    private readonly IValidator<UpdateTaskInputModel> _updateTaskRequestValidator;
     private readonly IMapper _mapper;
 
-    public TaskController(ITaskService taskService, IMapper mapper)
+    public TaskController(ITaskService taskService, IMapper mapper, IValidator<CreateTaskInputModel> createTaskRequestValidator, IValidator<UpdateTaskInputModel> updateTaskRequestValidator)
     {
         _taskService = taskService;
         _mapper = mapper;
+        _createTaskRequestValidator = createTaskRequestValidator;
+        _updateTaskRequestValidator = updateTaskRequestValidator;
     }
 
     /// <summary>
@@ -46,10 +51,12 @@ public class TaskController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateTaskInputModel task, [FromQuery] string categoryId, CancellationToken cancellationToken)
     {
-        if (task is null || string.IsNullOrWhiteSpace(task.Description)) return BadRequest();
-        if (string.IsNullOrWhiteSpace(categoryId)) return BadRequest();
+        if (task is null) return BadRequest();
     
         if (!ObjectId.TryParse(categoryId, out var categoryObjectId)) return BadRequest();
+        
+        var validation = await this._createTaskRequestValidator.ValidateAsync(task, cancellationToken);
+        if (!validation.IsValid) return BadRequest(validation.Errors);
     
         if (!this.TryGetUserObjectId(out var userId)) return Unauthorized();
     
@@ -70,11 +77,50 @@ public class TaskController : ControllerBase
         return Ok(response);
     }
 
+    /// <summary>
+    /// Update - Task
+    /// </summary>
+    /// <param name="task">The input model used to update an existing task</param>
+    /// <param name="cancellationToken">The <see cref="CancellationToken"/> used to propagate notifications that the operation should be cancelled</param>
+    /// <returns>
+    /// Returns the updated task as <see cref="TaskResponseModel"/> if the request is successful
+    /// </returns>
+    /// <remarks>
+    /// Updates a task for the authenticated user by replacing all mutable fields.
+    /// The authenticated user id is extracted from the request context.
+    /// The task must exist and belong to the authenticated user.
+    /// </remarks>
+    /// <response code="200">Returns the updated task</response>
+    /// <response code="400">The input is invalid or an error occurred during update</response>
+    /// <response code="401">The request is unauthorized</response>
+    /// <response code="404">The specified task was not found</response>
     [HttpPut]
-    public IActionResult Put([FromBody] TaskEntity task)
+    public async Task<IActionResult> Update([FromBody] UpdateTaskInputModel task, CancellationToken cancellationToken)
     {
-        return StatusCode(StatusCodes.Status501NotImplemented);
+        if (task is null) return BadRequest();
+
+        var validation = await this._updateTaskRequestValidator.ValidateAsync(task, cancellationToken);
+        if (!validation.IsValid) return BadRequest(validation.Errors);
+
+        if (!this.TryGetUserObjectId(out var userId)) return Unauthorized();
+
+        var updateResult = await _taskService.UpdateTask(task, userId, cancellationToken);
+
+        if (!updateResult.Success)
+        {
+            if (updateResult.Errors.Any(e => e is NotFoundError))
+                return NotFound(updateResult.Errors);
+
+            return BadRequest(updateResult.Errors);
+        }
+
+        var updatedEntity = updateResult.ResultObject;
+        if (updatedEntity is null) return NotFound();
+
+        var response = _mapper.Map<TaskResponseModel>(updatedEntity);
+        return Ok(response);
     }
+
 
     [HttpGet]
     public IActionResult Get([FromQuery] string entityId)

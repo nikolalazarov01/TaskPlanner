@@ -43,6 +43,41 @@ public class MongoDbRepositoryBase<TEntity> : IBaseRepository<TEntity>
     }
     
     /// <inheritdoc/>
+    public async Task<OperationResult<TEntity>> UpdateAsync(TEntity entity, CancellationToken cancellationToken)
+    {
+        var result = new OperationResult<TEntity>();
+
+        try
+        {
+            var filter = Builders<TEntity>.Filter.Eq(e => e.Id, entity.Id);
+
+            var options = new FindOneAndReplaceOptions<TEntity>
+            {
+                IsUpsert = false,
+                ReturnDocument = ReturnDocument.After
+            };
+
+            var updatedEntity = await Collection.FindOneAndReplaceAsync(filter, entity, options, cancellationToken);
+
+            if (updatedEntity is null) return result.AppendError("Entity not found.");;
+            
+            return result.WithRelatedObject(updatedEntity);
+        }
+        catch (MongoWriteException e) when
+            (e.WriteError?.Category == ServerErrorCategory.DuplicateKey)
+        {
+            result.AppendError(new DuplicateKeyError(e.WriteError.Message));
+            return result;
+        }
+        catch (Exception ex)
+        {
+            result.AppendError(ex.Message);
+            return result;
+        }
+    }
+
+    
+    /// <inheritdoc/>
     public async Task<OperationResult<TEntity>> ModifyAsync(TEntity entity, CancellationToken cancellationToken, UpdateDefinition<TEntity> update = null)
     {
         var result = new OperationResult<TEntity>();

@@ -12,6 +12,8 @@ using TaskPlanner.API.Data.Models;
 using TaskPlanner.API.Utilities;
 using Task = System.Threading.Tasks.Task;
 
+namespace TaskPlanner.Tests.Unit;
+
 public class IdentityServiceTests
 {
     private static (IdentityService Service, Mock<IBaseRepository<User>> Repo) CreateSut()
@@ -28,10 +30,6 @@ public class IdentityServiceTests
         var sut = new IdentityService(repo.Object, jwtOptions);
         return (sut, repo);
     }
-
-    // REMOVE these filter rendering tests - they test MongoDB internals, not your service behavior
-    // DELETE: RegisterAsync_ShouldCallGetOneAsync_WithEmailFilter
-    // DELETE: LoginAsync_ShouldCallGetOneAsync_WithEmailFilter
 
     [Fact]
     public async Task RegisterAsync_ShouldReturnError_When_UserAlreadyExists()

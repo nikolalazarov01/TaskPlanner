@@ -4,7 +4,7 @@ using TaskEntity = TaskPlanner.API.Data.Models.Task;
 using TaskPlanner.API.Web.Controllers;
 using Xunit;
 
-namespace TestPlanner.Tests.Integration;
+namespace TaskPlanner.Tests.Integration;
 
 public class TaskControllerTests
 {

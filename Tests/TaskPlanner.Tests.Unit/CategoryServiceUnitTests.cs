@@ -10,7 +10,7 @@ using TaskPlanner.API.Data.Models;
 using TaskPlanner.API.Utilities;
 using TaskPlanner.API.Utilities.Constants;
 
-namespace TestPlanner.Tests.Unit;
+namespace TaskPlanner.Tests.Unit;
 
 public class CategoryServiceTests
 {

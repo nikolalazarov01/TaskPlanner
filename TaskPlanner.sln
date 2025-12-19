@@ -18,7 +18,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaskPlanner.API.Web", "API\
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{AFD1C78A-70F6-4483-B8D6-BEB2456B71E1}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestPlanner.Tests.Unit", "Tests\TestPlanner.Tests.Unit\TestPlanner.Tests.Unit.csproj", "{50B938B9-6A46-43FF-B8F8-460EBBB24368}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaskPlanner.Tests.Unit", "Tests\TaskPlanner.Tests.Unit\TaskPlanner.Tests.Unit.csproj", "{50B938B9-6A46-43FF-B8F8-460EBBB24368}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaskPlanner.API.Utilities", "API\src\TaskPlanner.API.Utilities\TaskPlanner.API.Utilities.csproj", "{334239B3-F497-46DA-B40E-269229955663}"
 EndProject

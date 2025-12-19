@@ -26,7 +26,7 @@ public class Task : IEntity
     /// Optional identifier of the category this task belongs to
     /// </summary>
     [BsonRepresentation(BsonType.ObjectId)]
-    public ObjectId? CategoryId { get; set; }
+    public ObjectId CategoryId { get; set; }
 
     /// <summary>
     /// The description or title of the task

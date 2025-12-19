@@ -13,5 +13,6 @@ public static class ServicesConfigurationExtensions
         serviceCollection.AddScoped(typeof(IBaseRepository<>), typeof(MongoDbRepositoryBase<>));
         serviceCollection.AddScoped<IIdentityService, IdentityService>();
         serviceCollection.AddScoped<ICategoryService, CategoryService>();
+        serviceCollection.AddScoped<ITaskService, TaskService>();
     }
 }

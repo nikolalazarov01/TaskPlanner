@@ -59,5 +59,13 @@ public interface IBaseRepository<TEntity> where TEntity : IEntity
     /// <param name="cancellationToken">An instance of <see cref="CancellationToken</param>
     /// <returns><see cref="OperationResult"/>With result object containing count of the deleted entities</returns>
     Task<OperationResult<long>> DeleteManyAsync(FilterDefinition<TEntity> filter, CancellationToken cancellationToken);
+    
+    /// <summary>
+    /// A method, used to check whether any entity exists matching the provided filter
+    /// </summary>
+    /// <param name="filter">A definition for the filters, which will be used to check existence</param>
+    /// <param name="cancellationToken">An instance of <see cref="CancellationToken"/></param>
+    /// <returns><see cref="OperationResult"/>With result object containing a boolean indicating whether any entity exists</returns>
+    Task<OperationResult<bool>> AnyAsync(FilterDefinition<TEntity> filter, CancellationToken cancellationToken);
 }
 

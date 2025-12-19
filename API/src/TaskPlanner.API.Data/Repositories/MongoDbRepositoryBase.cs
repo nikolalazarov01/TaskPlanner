@@ -191,5 +191,25 @@ public class MongoDbRepositoryBase<TEntity> : IBaseRepository<TEntity>
             return result;
         }
     }
+    
+    /// <inheritdoc/>
+    public async Task<OperationResult<bool>> AnyAsync(FilterDefinition<TEntity> filter, CancellationToken cancellationToken)
+    {
+        var result = new OperationResult<bool>();
+
+        try
+        {
+            filter ??= Builders<TEntity>.Filter.Empty;
+
+            var any = await Collection.Find(filter).AnyAsync(cancellationToken);
+
+            return result.WithRelatedObject(any);
+        }
+        catch (Exception ex)
+        {
+            result.AppendError(ex.Message);
+            return result;
+        }
+    }
 }
 

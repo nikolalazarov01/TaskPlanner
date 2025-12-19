@@ -1,31 +1,24 @@
-using MongoDB.Bson;
-using MongoDB.Bson.Serialization.Attributes;
-using TaskPlanner.API.Data.Interfaces;
-
-namespace TaskPlanner.API.Data.Models;
+﻿namespace TaskPlanner.API.Core.Models.Category;
 
 /// <summary>
-/// Represents a category entity stored in the database
+/// Represents the response model returned by the API
 /// </summary>
-public class Category : IEntity
+public class CategoryResponseModel
 {
     /// <summary>
-    /// The unique identifier of the category document
+    /// The unique identifier of the category
     /// </summary>
-    [BsonId]
-    [BsonRepresentation(BsonType.ObjectId)]
-    public ObjectId Id { get; set; }
+    public required string Id { get; set; }
 
     /// <summary>
     /// The unique identifier of the user who owns the category
     /// </summary>
-    [BsonRepresentation(BsonType.ObjectId)]
-    public ObjectId UserId { get; set; }
+    public required string UserId { get; set; }
 
     /// <summary>
     /// The name of the category
     /// </summary>
-    public string Name { get; set; } = string.Empty;
+    public required string Name { get; set; }
 
     /// <summary>
     /// Optional color associated with the category in HEX format
@@ -40,5 +33,5 @@ public class Category : IEntity
     /// <summary>
     /// The date and time when the category was created
     /// </summary>
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; }
 }

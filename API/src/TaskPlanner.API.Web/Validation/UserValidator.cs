@@ -1,5 +1,6 @@
 ﻿using FluentValidation;
 using TaskPlanner.API.Core.Models;
+using TaskPlanner.API.Core.Models.Identity;
 
 namespace TaskPlanner.API.Web.Validation;
 

@@ -10,7 +10,8 @@ public static class ServicesConfigurationExtensions
 {
     public static void SetupServices(this IServiceCollection serviceCollection)
     {
-        serviceCollection.AddScoped<IUserRepository, UserRepository>();
+        serviceCollection.AddScoped(typeof(IBaseRepository<>), typeof(MongoDbRepositoryBase<>));
         serviceCollection.AddScoped<IIdentityService, IdentityService>();
+        serviceCollection.AddScoped<ICategoryService, CategoryService>();
     }
 }

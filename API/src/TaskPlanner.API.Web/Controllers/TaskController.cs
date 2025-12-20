@@ -199,7 +199,6 @@ public class TaskController : ControllerBase
     
         if (!this.TryGetUserObjectId(out var userId)) return Unauthorized();
     
-        // Service method to be implemented later
         var getResult = await _taskService.GetTaskById(id, userId, categoryId, cancellationToken);
     
         if (!getResult.Success)
@@ -236,7 +235,6 @@ public class TaskController : ControllerBase
     {
         if (!this.TryGetUserObjectId(out var userId)) return Unauthorized();
     
-        // Service method to be implemented later
         var getResult = await _taskService.GetTasks(userId, categoryId, cancellationToken);
     
         if (!getResult.Success)
@@ -245,7 +243,8 @@ public class TaskController : ControllerBase
             return BadRequest(getResult.Errors);
         }
     
-        var entities = getResult.ResultObject ?? Array.Empty<TaskEntity>();
+        var entities = getResult.ResultObject;
+        if (entities is null) return BadRequest();
     
         var response = _mapper.Map<List<TaskResponseModel>>(entities);
         return Ok(response);

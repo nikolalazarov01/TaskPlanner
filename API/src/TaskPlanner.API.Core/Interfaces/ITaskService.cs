@@ -55,4 +55,23 @@ public interface ITaskService
     /// <param name="cancellationToken">The <see cref="CancellationToken"/> used to propagate cancellation requests.</param>
     /// <returns>/// An <see cref="OperationResult{T}"/> containing the number of tasks that were updated if the operation succeeds, or validation / not-found errors otherwise.</returns>
     Task<OperationResult<long>> ModifyManyTaskStatus(ObjectId[] taskIds, ObjectId userId, TaskStatus status, CancellationToken cancellationToken);
+    
+    /// <summary>
+    /// Retrieves a single task by its identifier for the specified user.
+    /// </summary>
+    /// <param name="id">The identifier of the task.</param>
+    /// <param name="userId">The identifier of the user who owns the task.</param>
+    /// <param name="categoryId">Optional category identifier. When provided, the task must belong to this category.</param>
+    /// <param name="cancellationToken">The <see cref="CancellationToken"/> used to propagate cancellation requests.</param>
+    /// <returns>An <see cref="OperationResult{T}"/> containing the task if found, or not-found / validation errors otherwise.</returns>
+    Task<OperationResult<Data.Models.Task>> GetTaskById(string id, ObjectId userId, string? categoryId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Retrieves tasks belonging to the specified user.
+    /// </summary>
+    /// <param name="userId">The identifier of the user whose tasks should be retrieved.</param>
+    /// <param name="categoryId">Optional category identifier. When provided, only tasks in this category are returned.</param>
+    /// <param name="cancellationToken"> The <see cref="CancellationToken"/> used to propagate cancellation requests.</param>
+    /// <returns>An <see cref="OperationResult{T}"/> containing the list of tasks for the user (can be empty), or validation / retrieval errors otherwise.</returns>
+    Task<OperationResult<IReadOnlyList<Data.Models.Task>>> GetTasks(ObjectId userId, string? categoryId, CancellationToken cancellationToken);
 }

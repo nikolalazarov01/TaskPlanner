@@ -179,4 +179,75 @@ public class TaskService : ITaskService
 
         return operationResult.WithRelatedObject(modified.ResultObject);
     }
+    
+    /// <inheritdoc/>
+    public async Task<OperationResult<Data.Models.Task>> GetTaskById(string id, ObjectId userId, string? categoryId, CancellationToken cancellationToken)
+    {
+        var result = new OperationResult<Data.Models.Task>();
+    
+        if (userId == ObjectId.Empty)
+            return result.AppendError("Invalid user id.");
+    
+        if (string.IsNullOrWhiteSpace(id) || !ObjectId.TryParse(id, out var taskObjectId))
+            return result.AppendError("Invalid task id.");
+    
+        ObjectId? categoryObjectId = null;
+        if (!string.IsNullOrWhiteSpace(categoryId))
+        {
+            if (!ObjectId.TryParse(categoryId, out var parsedCategoryId))
+                return result.AppendError("Invalid category id.");
+    
+            categoryObjectId = parsedCategoryId;
+        }
+    
+        var filter = Builders<Data.Models.Task>.Filter.And(
+            Builders<Data.Models.Task>.Filter.Eq(x => x.Id, taskObjectId),
+            Builders<Data.Models.Task>.Filter.Eq(x => x.UserId, userId));
+    
+        if (categoryObjectId.HasValue)
+        {
+            filter = Builders<Data.Models.Task>.Filter.And(
+                filter,
+                Builders<Data.Models.Task>.Filter.Eq(x => x.CategoryId, categoryObjectId.Value));
+        }
+    
+        return await _taskRepository.GetOneAsync(filter, cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    public async Task<OperationResult<IReadOnlyList<Data.Models.Task>>> GetTasks(ObjectId userId, string? categoryId, CancellationToken cancellationToken)
+    {
+        var result = new OperationResult<IReadOnlyList<Data.Models.Task>>();
+    
+        if (userId == ObjectId.Empty)
+            return result.AppendError("Invalid user id.");
+    
+        ObjectId? categoryObjectId = null;
+        if (!string.IsNullOrWhiteSpace(categoryId))
+        {
+            if (!ObjectId.TryParse(categoryId, out var parsedCategoryId))
+                return result.AppendError("Invalid category id.");
+    
+            categoryObjectId = parsedCategoryId;
+        }
+    
+        var filter = Builders<Data.Models.Task>.Filter.Eq(x => x.UserId, userId);
+    
+        if (categoryObjectId.HasValue)
+        {
+            filter = Builders<Data.Models.Task>.Filter.And(
+                filter,
+                Builders<Data.Models.Task>.Filter.Eq(x => x.CategoryId, categoryObjectId.Value));
+        }
+    
+        // Optional: sort by CreatedAt descending (adjust to your preference)
+        var sort = Builders<Data.Models.Task>.Sort.Descending(x => x.CreatedAt);
+    
+        var get = await _taskRepository.GetAsync(filter, cancellationToken, sort: sort);
+    
+        if (!get.Success)
+            return result.AppendErrors(get);
+    
+        return result.WithRelatedObject(get.ResultObject ?? Array.Empty<Data.Models.Task>());
+    }
 }

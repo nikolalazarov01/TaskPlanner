@@ -146,17 +146,111 @@ public class TaskController : ControllerBase
         return await UpdateTaskStatusesInternal(taskIds, status, cancellationToken);
     }
     
+    /// <summary>
+    /// Updates the status of a single task belonging to the authenticated user.
+    /// </summary>
+    /// <param name="taskId">
+    /// The identifier of the task whose status should be updated.
+    /// </param>
+    /// <param name="status">
+    /// The new status to assign to the task.
+    /// </param>
+    /// <param name="cancellationToken">
+    /// The <see cref="CancellationToken"/> used to propagate cancellation requests.
+    /// </param>
+    /// <returns>
+    /// Returns the number of updated tasks (0 or 1) if the request is successful.
+    /// </returns>
+    /// <remarks>
+    /// The authenticated user id is extracted from the request context.
+    /// The task must exist and belong to the authenticated user; otherwise, a not-found error is returned.
+    /// </remarks>
+    /// <response code="200">Returns the number of updated tasks</response>
+    /// <response code="400">The input is invalid or an error occurred during the update</response>
+    /// <response code="401">The request is unauthorized</response>
+    /// <response code="404">The specified task was not found</response>
     [HttpPatch("update-status")]
     public async Task<IActionResult> UpdateStatusOne([FromQuery] ObjectId taskId, [FromQuery] TaskStatus status, CancellationToken cancellationToken)
     {
         return await UpdateTaskStatusesInternal([taskId], status, cancellationToken);
     }
 
-    [HttpGet]
-    public IActionResult Get([FromQuery] string entityId)
+    /// <summary>
+    /// Get - Task
+    /// </summary>
+    /// <param name="id">The identifier of the task</param>
+    /// <param name="categoryId">
+    /// Optional category identifier. When provided, the task must belong to this category.
+    /// </param>
+    /// <param name="cancellationToken">The <see cref="CancellationToken"/> used to propagate notifications that the operation should be cancelled</param>
+    /// <returns>Returns a single task as <see cref="TaskResponseModel"/> if found</returns>
+    /// <remarks>
+    /// Retrieves a single task by id for the authenticated user.
+    /// If <paramref name="categoryId"/> is provided, the task must also match that category.
+    /// </remarks>
+    /// <response code="200">Returns the task</response>
+    /// <response code="400">The request is invalid or an error occurred during retrieval</response>
+    /// <response code="401">The request is unauthorized</response>
+    /// <response code="404">The task was not found</response>
+    [HttpGet("{id}")]
+    public async Task<IActionResult> GetOne([FromRoute] string id, [FromQuery] string? categoryId, CancellationToken cancellationToken)
     {
-        return StatusCode(StatusCodes.Status501NotImplemented);
+        if (string.IsNullOrWhiteSpace(id)) return BadRequest();
+    
+        if (!this.TryGetUserObjectId(out var userId)) return Unauthorized();
+    
+        // Service method to be implemented later
+        var getResult = await _taskService.GetTaskById(id, userId, categoryId, cancellationToken);
+    
+        if (!getResult.Success)
+        {
+            if (getResult.Errors.Any(e => e is NotFoundError)) return NotFound(getResult.Errors);
+            return BadRequest(getResult.Errors);
+        }
+    
+        var entity = getResult.ResultObject;
+        if (entity is null) return NotFound();
+    
+        var response = _mapper.Map<TaskResponseModel>(entity);
+        return Ok(response);
     }
+    
+    /// <summary>
+    /// Get - Tasks
+    /// </summary>
+    /// <param name="categoryId">
+    /// Optional category identifier. When provided, only tasks in this category are returned.
+    /// </param>
+    /// <param name="cancellationToken">The <see cref="CancellationToken"/> used to propagate notifications that the operation should be cancelled</param>
+    /// <returns>Returns a list of tasks as <see cref="TaskResponseModel"/> for the authenticated user</returns>
+    /// <remarks>
+    /// Retrieves tasks belonging to the authenticated user.
+    /// If <paramref name="categoryId"/> is provided, tasks are filtered by that category.
+    /// </remarks>
+    /// <response code="200">Returns the list of tasks (can be empty)</response>
+    /// <response code="400">The request is invalid or an error occurred during retrieval</response>
+    /// <response code="401">The request is unauthorized</response>
+    /// <response code="404">No tasks were found (depending on service/repository behavior)</response>
+    [HttpGet]
+    public async Task<IActionResult> GetMany([FromQuery] string? categoryId, CancellationToken cancellationToken)
+    {
+        if (!this.TryGetUserObjectId(out var userId)) return Unauthorized();
+    
+        // Service method to be implemented later
+        var getResult = await _taskService.GetTasks(userId, categoryId, cancellationToken);
+    
+        if (!getResult.Success)
+        {
+            if (getResult.Errors.Any(e => e is NotFoundError)) return NotFound(getResult.Errors);
+            return BadRequest(getResult.Errors);
+        }
+    
+        var entities = getResult.ResultObject ?? Array.Empty<TaskEntity>();
+    
+        var response = _mapper.Map<List<TaskResponseModel>>(entities);
+        return Ok(response);
+    }
+
 
     [HttpDelete]
     public IActionResult Delete([FromQuery] string entityId)

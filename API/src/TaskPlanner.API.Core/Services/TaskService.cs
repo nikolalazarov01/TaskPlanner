@@ -108,4 +108,75 @@ public class TaskService : ITaskService
 
         return await this._taskRepository.UpdateAsync(updatedEntity, cancellationToken);
     }
+    
+    /// <inheritdoc/>
+    public async Task<OperationResult<long>> ModifyTaskStatus(ObjectId taskId, ObjectId userId, TaskStatus status, CancellationToken cancellationToken)
+    {
+        var operationResult = new OperationResult<long>();
+
+        if (userId == ObjectId.Empty)
+            return operationResult.AppendError("Invalid user id.");
+
+        if (taskId == ObjectId.Empty)
+            return operationResult.AppendError("Invalid task id.");
+
+        var filter = Builders<Data.Models.Task>.Filter.And(
+            Builders<Data.Models.Task>.Filter.Eq(x => x.UserId, userId),
+            Builders<Data.Models.Task>.Filter.Eq(x => x.Id, taskId));
+
+        // Ensure it exists for this user
+        var existing = await _taskRepository.GetOneAsync(filter, cancellationToken);
+        if (!existing.Success)
+            return operationResult.AppendErrors(existing);
+
+        var update = Builders<Data.Models.Task>.Update
+            .Set(x => x.Status, status)
+            .Set(x => x.UpdatedAt, DateTime.UtcNow);
+
+        // Reuse ModifyMany for consistency; the filter matches at most 1 document
+        var modified = await _taskRepository.ModifyManyAsync(filter, update, cancellationToken);
+        if (!modified.Success)
+            return operationResult.AppendErrors(modified);
+
+        return operationResult.WithRelatedObject(modified.ResultObject);
+    }
+    
+    /// <inheritdoc/>
+    public async Task<OperationResult<long>> ModifyManyTaskStatus(ObjectId[] taskIds, ObjectId userId, TaskStatus status, CancellationToken cancellationToken)
+    {
+        var operationResult = new OperationResult<long>();
+
+        if (userId == ObjectId.Empty)
+            return operationResult.AppendError("Invalid user id.");
+
+        if (taskIds is null || taskIds.Length == 0)
+            return operationResult.AppendError("No tasks provided.");
+
+        var filter = Builders<Data.Models.Task>.Filter.And(
+            Builders<Data.Models.Task>.Filter.Eq(x => x.UserId, userId),
+            Builders<Data.Models.Task>.Filter.In(x => x.Id, taskIds));
+
+        var existing = await _taskRepository.GetAsync(filter, cancellationToken);
+        if (!existing.Success)
+            return operationResult.AppendErrors(existing);
+
+        var foundCount = existing.ResultObject?.Count ?? 0;
+        if (foundCount != taskIds.Length)
+        {
+            var existingIds = existing.ResultObject?.Select(x => x.Id).ToHashSet() ?? new HashSet<ObjectId>();
+            var missing = taskIds.Where(id => !existingIds.Contains(id)).ToList();
+
+            operationResult.AppendError(new NotFoundError($"Some tasks were not found: {string.Join(", ", missing)}"));
+            return operationResult;
+        }
+
+        var update = Builders<Data.Models.Task>.Update
+            .Set(x => x.Status, status)
+            .Set(x => x.UpdatedAt, DateTime.UtcNow);
+
+        var modified = await _taskRepository.ModifyManyAsync(filter, update, cancellationToken);
+        if (!modified.Success) return operationResult.AppendErrors(modified);
+
+        return operationResult.WithRelatedObject(modified.ResultObject);
+    }
 }

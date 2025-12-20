@@ -76,6 +76,50 @@ public class MongoDbRepositoryBase<TEntity> : IBaseRepository<TEntity>
         }
     }
 
+    /// <inheritdoc/>
+    public async Task<OperationResult<long>> UpdateManyAsync(FilterDefinition<TEntity> filter, UpdateDefinition<TEntity> update, CancellationToken cancellationToken)
+    {
+        var result = new OperationResult<long>();
+
+        try
+        {
+            if (filter is null)
+            {
+                filter = Builders<TEntity>.Filter.Empty;
+            }
+
+            if (update is null)
+            {
+                result.AppendError("Update definition must be provided.");
+                return result;
+            }
+
+            var updateResult = await Collection.UpdateManyAsync(
+                filter,
+                update,
+                cancellationToken: cancellationToken);
+
+            // Optional "not found" semantics
+            if (updateResult.MatchedCount == 0)
+            {
+                result.AppendError(new NotFoundError("No entities found to update."));
+                return result;
+            }
+
+            return result.WithRelatedObject(updateResult.ModifiedCount);
+        }
+        catch (MongoWriteException e) when
+            (e.WriteError?.Category == ServerErrorCategory.DuplicateKey)
+        {
+            result.AppendError(new DuplicateKeyError(e.WriteError.Message));
+            return result;
+        }
+        catch (Exception ex)
+        {
+            result.AppendError(ex.Message);
+            return result;
+        }
+    }
     
     /// <inheritdoc/>
     public async Task<OperationResult<TEntity>> ModifyAsync(TEntity entity, CancellationToken cancellationToken, UpdateDefinition<TEntity> update = null)
@@ -106,6 +150,54 @@ public class MongoDbRepositoryBase<TEntity> : IBaseRepository<TEntity>
             (e.WriteError?.Category == ServerErrorCategory.DuplicateKey)
         {
             result.AppendError(new DuplicateKeyError(e.WriteError.Message));
+            return result;
+        }
+    }
+    
+    /// <inheritdoc/>
+    public async Task<OperationResult<long>> ModifyManyAsync(FilterDefinition<TEntity> filter, UpdateDefinition<TEntity> update, CancellationToken cancellationToken, bool isUpsert = false)
+    {
+        var result = new OperationResult<long>();
+
+        try
+        {
+            filter ??= Builders<TEntity>.Filter.Empty;
+
+            if (update is null)
+            {
+                result.AppendError("Update definition must be provided.");
+                return result;
+            }
+
+            var options = new UpdateOptions
+            {
+                IsUpsert = isUpsert
+            };
+
+            var updateResult = await Collection.UpdateManyAsync(
+                filter,
+                update,
+                options,
+                cancellationToken);
+
+            // Optional "not found" semantics (only when not upserting)
+            if (!isUpsert && updateResult.MatchedCount == 0)
+            {
+                result.AppendError(new NotFoundError("No entities found to modify."));
+                return result;
+            }
+
+            return result.WithRelatedObject(updateResult.ModifiedCount);
+        }
+        catch (MongoWriteException e) when
+            (e.WriteError?.Category == ServerErrorCategory.DuplicateKey)
+        {
+            result.AppendError(new DuplicateKeyError(e.WriteError.Message));
+            return result;
+        }
+        catch (Exception ex)
+        {
+            result.AppendError(ex.Message);
             return result;
         }
     }

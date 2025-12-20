@@ -1,6 +1,7 @@
 ﻿using MongoDB.Bson;
 using OneBitSoftware.Utilities;
 using TaskPlanner.API.Core.Models.Task;
+using TaskStatus = TaskPlanner.API.Data.Models.TaskStatus;
 
 namespace TaskPlanner.API.Core.Interfaces;
 
@@ -30,4 +31,28 @@ public interface ITaskService
     /// <param name="cancellationToken">The <see cref="CancellationToken"/> used to propagate cancellation requests</param>
     /// <returns>An <see cref="OperationResult{T}"/> containing the updated task entity if the update succeeds, or validation / not-found errors otherwise</returns>
     Task<OperationResult<Data.Models.Task>> UpdateTask(UpdateTaskInputModel input, ObjectId userId, CancellationToken cancellationToken);
+    
+    /// <summary>
+    /// Updates the status of a single task belonging to the specified user.
+    /// The task must exist and belong to the given user; otherwise a not-found error is returned.
+    /// </summary>
+    /// <param name="taskId">The identifier of the task to update.</param>
+    /// <param name="userId">The identifier of the user who owns the task.</param>
+    /// <param name="status">The new status to assign to the task.</param>
+    /// <param name="cancellationToken">The <see cref="CancellationToken"/> used to propagate cancellation requests.</param>
+    /// <returns>An <see cref="OperationResult{T}"/> containing the number of updated tasks (0 or 1) if successful, or validation / not-found errors otherwise.</returns>
+    Task<OperationResult<long>> ModifyTaskStatus(ObjectId taskId, ObjectId userId, TaskStatus status, CancellationToken cancellationToken);
+    
+    /// <summary>
+    /// Updates the status of multiple tasks belonging to the specified user in a single bulk operation.
+    /// 
+    /// All provided task identifiers must exist and belong to the given user; otherwise,
+    /// the operation fails with a not-found error and no updates are applied.
+    /// </summary>
+    /// <param name="taskIds">An array of task identifiers to be updated.</param>
+    /// <param name="userId">The identifier of the user who owns the tasks.</param>
+    /// <param name="status">The new status to assign to all specified tasks.</param>
+    /// <param name="cancellationToken">The <see cref="CancellationToken"/> used to propagate cancellation requests.</param>
+    /// <returns>/// An <see cref="OperationResult{T}"/> containing the number of tasks that were updated if the operation succeeds, or validation / not-found errors otherwise.</returns>
+    Task<OperationResult<long>> ModifyManyTaskStatus(ObjectId[] taskIds, ObjectId userId, TaskStatus status, CancellationToken cancellationToken);
 }

@@ -121,7 +121,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
     private async Task<TaskEntity> InsertTaskAsync(ObjectId userId, ObjectId categoryId, ObjectId taskId,
         CancellationToken cancellationToken)
     {
-        var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
+        var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database);
 
         var entity = new TaskEntity
         {

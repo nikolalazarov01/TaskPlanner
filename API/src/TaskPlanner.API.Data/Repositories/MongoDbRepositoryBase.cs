@@ -1,5 +1,6 @@
 using MongoDB.Driver;
 using OneBitSoftware.Utilities;
+using TaskPlanner.API.Data.Extensions;
 using TaskPlanner.API.Data.Interfaces;
 using TaskPlanner.API.Utilities;
 
@@ -9,21 +10,18 @@ namespace TaskPlanner.API.Data.Repositories;
 public class MongoDbRepositoryBase<TEntity> : IBaseRepository<TEntity>
     where TEntity : IEntity
 {
-    public MongoDbRepositoryBase(IMongoDatabase database, string collectionName)
+    public MongoDbRepositoryBase(IMongoDatabase database, string? collectionName = null)
     {
         Database = database ?? throw new ArgumentNullException(nameof(database));
 
-        if (string.IsNullOrWhiteSpace(collectionName))
-        {
-            throw new ArgumentException("Collection name must be provided.", nameof(collectionName));
-        }
+        collectionName ??= this.ResolveCollectionName();
 
         Collection = database.GetCollection<TEntity>(collectionName);
     }
 
     protected IMongoDatabase Database { get; }
 
-    protected IMongoCollection<TEntity> Collection { get; }
+    private IMongoCollection<TEntity> Collection { get; }
     
     /// <inheritdoc/>
     public async Task<OperationResult<TEntity>> CreateAsync(TEntity entity)

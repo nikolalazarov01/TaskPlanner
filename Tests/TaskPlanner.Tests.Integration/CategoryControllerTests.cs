@@ -30,8 +30,8 @@ public class CategoryControllerTests : IClassFixture<Mongo2GoFixture>
 
     private CategoryController CreateAuthenticatedController()
     {
-        var repository = new MongoDbRepositoryBase<Category>(_mongoFixture.Database, "Categories");
-        var tasksRepository = new MongoDbRepositoryBase<TaskPlanner.API.Data.Models.Task>(_mongoFixture.Database, "Tasks");
+        var repository = new MongoDbRepositoryBase<Category>(_mongoFixture.Database);
+        var tasksRepository = new MongoDbRepositoryBase<TaskPlanner.API.Data.Models.Task>(_mongoFixture.Database);
         
         var service = new CategoryService(repository);
         var taskService = new TaskService(tasksRepository, repository);

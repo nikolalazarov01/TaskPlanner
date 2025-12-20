@@ -28,7 +28,7 @@ public class IdentityControllerTests : IClassFixture<Mongo2GoFixture>
     
     private IdentityController CreateController()
     {
-        var repository = new MongoDbRepositoryBase<User>(_mongoFixture.Database, "users");
+        var repository = new MongoDbRepositoryBase<User>(_mongoFixture.Database);
 
         var jwtOptions = Options.Create(new JwtOptions
         {

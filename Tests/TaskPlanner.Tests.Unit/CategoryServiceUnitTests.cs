@@ -318,7 +318,7 @@ public class CategoryServiceTests
     {
         var (sut, repo) = CreateSut();
 
-        var result = await sut.DeleteCategory("invalid-id", ObjectId.GenerateNewId(), CancellationToken.None);
+        var result = await sut.DeleteCategory(ObjectId.Empty, ObjectId.GenerateNewId(), CancellationToken.None);
 
         repo.Verify(x => x.DeleteOneAsync(It.IsAny<FilterDefinition<Category>>(), It.IsAny<CancellationToken>()), Times.Never);
 
@@ -346,7 +346,7 @@ public class CategoryServiceTests
         var userId = ObjectId.GenerateNewId();
         var cts = new CancellationTokenSource();
 
-        await sut.DeleteCategory(categoryId.ToString(), userId, cts.Token);
+        await sut.DeleteCategory(categoryId, userId, cts.Token);
 
         repo.Verify(x => x.DeleteOneAsync(It.IsAny<FilterDefinition<Category>>(), It.IsAny<CancellationToken>()), Times.Once);
 
@@ -426,7 +426,7 @@ public class CategoryServiceTests
             .ReturnsAsync(deleteOneResult);
 
         var get = await sut.GetCategoryById(categoryId.ToString(), userId, CancellationToken.None);
-        var del = await sut.DeleteCategory(categoryId.ToString(), userId, CancellationToken.None);
+        var del = await sut.DeleteCategory(categoryId, userId, CancellationToken.None);
 
         Assert.Same(expectedCategory, get.ResultObject);
         Assert.Same(expectedCategory, del.ResultObject);

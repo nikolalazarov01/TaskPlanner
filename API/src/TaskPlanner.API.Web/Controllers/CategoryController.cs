@@ -3,6 +3,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using MongoDB.Bson;
 using TaskPlanner.API.Core.Interfaces;
 using TaskPlanner.API.Core.Models.Category;
 using TaskPlanner.API.Data.Models;
@@ -20,6 +21,7 @@ namespace TaskPlanner.API.Web.Controllers;
 public class CategoryController : ControllerBase
 {
     private readonly ICategoryService _categoryService;
+    private readonly ITaskService _taskService;
     private readonly IValidator<CategoryInputModel> _categoryRequestValidator;
     private readonly IValidator<UpdateCategoryInputModel> _updateCategoryRequestValidator;
     private readonly IMapper _mapper;
@@ -28,12 +30,14 @@ public class CategoryController : ControllerBase
     /// Initializes a new instance of the <see cref="CategoryController"/>
     /// </summary>
     /// <param name="categoryService">Service that contains the business logic for categories</param>
+    /// <param name="taskService">Service that contains the business logic for tasks</param>
     /// <param name="categoryRequestValidator">Validator for <see cref="CategoryInputModel"/></param>
     /// <param name="updateCategoryRequestValidator">Validator for <see cref="UpdateCategoryInputModel"/></param>
     /// <param name="mapper">Mapper used to map entities to response models</param>
-    public CategoryController(ICategoryService categoryService, IValidator<CategoryInputModel> categoryRequestValidator, IValidator<UpdateCategoryInputModel> updateCategoryRequestValidator, IMapper mapper)
+    public CategoryController(ICategoryService categoryService, ITaskService taskService, IValidator<CategoryInputModel> categoryRequestValidator, IValidator<UpdateCategoryInputModel> updateCategoryRequestValidator, IMapper mapper)
     {
         _categoryService = categoryService;
+        _taskService = taskService;
         _categoryRequestValidator = categoryRequestValidator;
         _mapper = mapper;
         _updateCategoryRequestValidator = updateCategoryRequestValidator;
@@ -186,9 +190,9 @@ public class CategoryController : ControllerBase
     /// <response code="401">The request is unauthorized</response>
     /// <response code="404">The category was not found</response>
     [HttpDelete("{id}")]
-    public async Task<IActionResult> DeleteOne([FromRoute] string id, CancellationToken cancellationToken)
+    public async Task<IActionResult> DeleteOne([FromRoute] ObjectId id, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(id)) return BadRequest();
+        if (id == ObjectId.Empty) return BadRequest();
 
         if (!this.TryGetUserObjectId(out var userId)) return Unauthorized();
 
@@ -204,11 +208,70 @@ public class CategoryController : ControllerBase
 
         var deleted = deleteResult.ResultObject;
         if (deleted is null) return NotFound();
+        
+        var deleteCorrespondingTasks = await this._taskService.DeleteByCategoryId(id, userId, cancellationToken);
+
+        if (!deleteCorrespondingTasks.Success)
+        {
+            if (!deleteResult.Errors.Any(e => e is NotFoundError))
+                return BadRequest(deleteResult.Errors);
+        }
 
         var response = _mapper.Map<CategoryResponseModel>(deleted);
         return Ok(response);
     }
 
+    /// <summary>
+    /// Delete - Categories (selected)
+    /// </summary>
+    /// <param name="categoryIds">The identifiers of the categories to delete.</param>
+    /// <param name="cancellationToken">The <see cref="CancellationToken"/> used to propagate notifications that the operation should be cancelled</param>
+    /// <returns>
+    /// Returns the number of deleted categories if the request is successful.
+    /// </returns>
+    /// <remarks>
+    /// Deletes multiple categories for the authenticated user in a single operation.
+    /// The authenticated user id is extracted from the request context.
+    /// All provided category ids must exist and belong to the authenticated user; otherwise no deletions are applied.
+    /// On successful category deletion, all tasks belonging to the deleted categories are also deleted.
+    /// </remarks>
+    /// <response code="200">Returns the number of deleted categories</response>
+    /// <response code="400">The input is invalid or an error occurred during deletion</response>
+    /// <response code="401">The request is unauthorized</response>
+    /// <response code="404">One or more categories were not found</response>
+    [HttpDelete]
+    public async Task<IActionResult> DeleteMany([FromQuery] ObjectId[] categoryIds, CancellationToken cancellationToken)
+    {
+        if (categoryIds is null || categoryIds.Length == 0) return BadRequest();
+        if (categoryIds.Any(x => x == ObjectId.Empty)) return BadRequest();
+    
+        if (!this.TryGetUserObjectId(out var userId)) return Unauthorized();
+    
+        // delete categories first (source of truth for which categories were deleted)
+        var deleteResult = await _categoryService.DeleteCategories(categoryIds, userId, cancellationToken);
+    
+        if (!deleteResult.Success)
+        {
+            if (deleteResult.Errors.Any(e => e is NotFoundError))
+                return NotFound(deleteResult.Errors);
+    
+            return BadRequest(deleteResult.Errors);
+        }
+    
+        // cascade delete tasks for those categories
+        var deleteCorrespondingTasks = await _taskService.DeleteMany(categoryIds, userId, cancellationToken);
+    
+        if (!deleteCorrespondingTasks.Success)
+        {
+            // keep same pattern you used above:
+            // only surface errors if it is NOT a NotFoundError (i.e. if something actually failed)
+            if (!deleteCorrespondingTasks.Errors.Any(e => e is NotFoundError))
+                return BadRequest(deleteCorrespondingTasks.Errors);
+        }
+    
+        return Ok(deleteResult.ResultObject);
+    }
+    
     /// <summary>
     /// Delete - Categories
     /// </summary>
@@ -221,8 +284,8 @@ public class CategoryController : ControllerBase
     /// <response code="400">The request is invalid or an error occurred during deletion</response>
     /// <response code="401">The request is unauthorized</response>
     /// <response code="404">No categories were found to delete (depending on service/repository behavior)</response>
-    [HttpDelete]
-    public async Task<IActionResult> DeleteMany(CancellationToken cancellationToken)
+    [HttpDelete("by-user-id")]
+    public async Task<IActionResult> DeleteByUserId(CancellationToken cancellationToken)
     {
         if (!this.TryGetUserObjectId(out var userId)) return Unauthorized();
 
@@ -235,6 +298,15 @@ public class CategoryController : ControllerBase
 
             return BadRequest(deleteResult.Errors);
         }
+        
+        var deleteCorrespondingTasks = await this._taskService.DeleteMany(userId, cancellationToken);
+
+        if (!deleteCorrespondingTasks.Success)
+        {
+            if (!deleteResult.Errors.Any(e => e is NotFoundError))
+                return BadRequest(deleteResult.Errors);
+        }
+
 
         // returns deleted count
         return Ok(new { deletedCount = deleteResult.ResultObject });

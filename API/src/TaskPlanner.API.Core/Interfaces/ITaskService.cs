@@ -74,4 +74,45 @@ public interface ITaskService
     /// <param name="cancellationToken"> The <see cref="CancellationToken"/> used to propagate cancellation requests.</param>
     /// <returns>An <see cref="OperationResult{T}"/> containing the list of tasks for the user (can be empty), or validation / retrieval errors otherwise.</returns>
     Task<OperationResult<IReadOnlyList<Data.Models.Task>>> GetTasks(ObjectId userId, string? categoryId, CancellationToken cancellationToken);
+    
+    /// <summary>
+    /// Deletes a single task by its identifier for the specified user.
+    /// The task must exist and belong to the given user; otherwise a not-found error is returned.
+    /// </summary>
+    /// <param name="taskId">The identifier of the task to delete.</param>
+    /// <param name="userId">The identifier of the user who owns the task.</param>
+    /// <param name="cancellationToken">The <see cref="CancellationToken"/> used to propagate cancellation requests.</param>
+    /// <returns>An <see cref="OperationResult{T}"/> containing the deleted task if deletion succeeds, or validation / not-found errors otherwise.</returns>
+    Task<OperationResult<Data.Models.Task>> DeleteOne(ObjectId taskId, ObjectId userId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Deletes multiple tasks by their identifiers for the specified user in a single bulk operation.
+    /// 
+    /// All provided task identifiers must exist and belong to the given user; otherwise,
+    /// the operation fails with a not-found error and no deletions are applied.
+    /// </summary>
+    /// <param name="taskIds">An array of task identifiers to delete.</param>
+    /// <param name="userId">The identifier of the user who owns the tasks.</param>
+    /// <param name="cancellationToken">The <see cref="CancellationToken"/> used to propagate cancellation requests.</param>
+    /// <returns>An <see cref="OperationResult{T}"/> containing the number of deleted tasks if the operation succeeds, or validation / not-found errors otherwise.</returns>
+    Task<OperationResult<long>> DeleteMany(ObjectId[] taskIds, ObjectId userId, CancellationToken cancellationToken);
+    
+    /// <summary>
+    /// Deletes multiple tasks for the specified user in a single bulk operation.
+    /// </summary>
+    /// <param name="userId">The identifier of the user who owns the tasks.</param>
+    /// <param name="cancellationToken">The <see cref="CancellationToken"/> used to propagate cancellation requests.</param>
+    /// <returns>An <see cref="OperationResult{T}"/> containing the number of deleted tasks if the operation succeeds, or validation / not-found errors otherwise.</returns>
+    Task<OperationResult<long>> DeleteMany(ObjectId userId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Deletes all tasks in the specified category for the given user.
+    /// 
+    /// The category must exist and belong to the given user; otherwise a not-found error is returned.
+    /// </summary>
+    /// <param name="categoryId">The identifier of the category whose tasks should be deleted.</param>
+    /// <param name="userId">The identifier of the user who owns the category and tasks.</param>
+    /// <param name="cancellationToken">The <see cref="CancellationToken"/> used to propagate cancellation requests.</param>
+    /// <returns>An <see cref="OperationResult{T}"/> containing the number of deleted tasks if the operation succeeds, or validation / not-found errors otherwise.</returns>
+    Task<OperationResult<long>> DeleteByCategoryId(ObjectId categoryId, ObjectId userId, CancellationToken cancellationToken);
 }

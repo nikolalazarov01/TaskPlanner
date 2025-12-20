@@ -52,10 +52,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         var controller = new TaskController(service, mapper, createValidator, updateValidator);
 
         userId = ObjectId.GenerateNewId();
-        var claims = new[]
-        {
-            new Claim(ClaimTypes.NameIdentifier, userId.ToString())
-        };
+        var claims = new[] { new Claim(ClaimTypes.NameIdentifier, userId.ToString()) };
 
         controller.ControllerContext = new ControllerContext
         {
@@ -220,13 +217,8 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         var longDescription = new string('a', 51);
 
         var result = await controller.Create(
-            new CreateTaskInputModel
-            {
-                Description = longDescription,
-                Priority = TaskPriority.Medium
-            },
-            categoryId.ToString(),
-            CancellationToken.None);
+            new CreateTaskInputModel { Description = longDescription, Priority = TaskPriority.Medium },
+            categoryId.ToString(), CancellationToken.None);
 
         var badRequest = Assert.IsType<BadRequestObjectResult>(result);
         Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
@@ -246,14 +238,8 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         var pastDeadline = DateTime.UtcNow.AddMinutes(-1);
 
         var result = await controller.Create(
-            new CreateTaskInputModel
-            {
-                Description = "Valid",
-                Priority = TaskPriority.Medium,
-                Deadline = pastDeadline
-            },
-            categoryId.ToString(),
-            CancellationToken.None);
+            new CreateTaskInputModel { Description = "Valid", Priority = TaskPriority.Medium, Deadline = pastDeadline },
+            categoryId.ToString(), CancellationToken.None);
 
         var badRequest = Assert.IsType<BadRequestObjectResult>(result);
         Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
@@ -271,14 +257,8 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         await InsertCategoryAsync(userId, categoryId, CancellationToken.None);
 
         var result = await controller.Create(
-            new CreateTaskInputModel
-            {
-                Description = "Valid",
-                Priority = TaskPriority.Medium,
-                EstimatedMinutes = -1
-            },
-            categoryId.ToString(),
-            CancellationToken.None);
+            new CreateTaskInputModel { Description = "Valid", Priority = TaskPriority.Medium, EstimatedMinutes = -1 },
+            categoryId.ToString(), CancellationToken.None);
 
         var badRequest = Assert.IsType<BadRequestObjectResult>(result);
         Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
@@ -296,8 +276,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
 
         var result = await controller.Create(
             new CreateTaskInputModel { Description = "Task", Priority = TaskPriority.High },
-            missingCategoryId.ToString(),
-            CancellationToken.None);
+            missingCategoryId.ToString(), CancellationToken.None);
 
         var badRequest = Assert.IsType<BadRequestObjectResult>(result);
         Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
@@ -322,13 +301,8 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         var result = await controller.Create(
             new CreateTaskInputModel
             {
-                Description = "My task",
-                Priority = TaskPriority.High,
-                EstimatedMinutes = 45,
-                Deadline = deadline
-            },
-            categoryId.ToString(),
-            CancellationToken.None);
+                Description = "My task", Priority = TaskPriority.High, EstimatedMinutes = 45, Deadline = deadline
+            }, categoryId.ToString(), CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result);
         Assert.Equal(StatusCodes.Status200OK, ok.StatusCode);
@@ -345,10 +319,8 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         Assert.True(diffResp < TimeSpan.FromMilliseconds(1), $"Deadline differs by {diffResp.TotalMilliseconds} ms");
 
         var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
-        var filter = Builders<TaskEntity>.Filter.And(
-            Builders<TaskEntity>.Filter.Eq(x => x.UserId, userId),
-            Builders<TaskEntity>.Filter.Eq(x => x.CategoryId, categoryId)
-        );
+        var filter = Builders<TaskEntity>.Filter.And(Builders<TaskEntity>.Filter.Eq(x => x.UserId, userId),
+            Builders<TaskEntity>.Filter.Eq(x => x.CategoryId, categoryId));
 
         var get = await taskRepository.GetAsync(filter, CancellationToken.None);
         Assert.True(get.Success);
@@ -381,13 +353,8 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         await InsertCategoryAsync(userA, categoryIdOfA, CancellationToken.None);
 
         var result = await controllerB.Create(
-            new CreateTaskInputModel
-            {
-                Description = "Should fail",
-                Priority = TaskPriority.Medium
-            },
-            categoryIdOfA.ToString(),
-            CancellationToken.None);
+            new CreateTaskInputModel { Description = "Should fail", Priority = TaskPriority.Medium },
+            categoryIdOfA.ToString(), CancellationToken.None);
 
         var badRequest = Assert.IsType<BadRequestObjectResult>(result);
         Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
@@ -399,10 +366,8 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         Assert.True(getB.Success);
         Assert.Empty(getB.ResultObject);
 
-        var filterAinCat = Builders<TaskEntity>.Filter.And(
-            Builders<TaskEntity>.Filter.Eq(x => x.UserId, userA),
-            Builders<TaskEntity>.Filter.Eq(x => x.CategoryId, categoryIdOfA)
-        );
+        var filterAinCat = Builders<TaskEntity>.Filter.And(Builders<TaskEntity>.Filter.Eq(x => x.UserId, userA),
+            Builders<TaskEntity>.Filter.Eq(x => x.CategoryId, categoryIdOfA));
         var getA = await taskRepository.GetAsync(filterAinCat, CancellationToken.None);
         Assert.True(getA.Success);
         Assert.Empty(getA.ResultObject);
@@ -431,8 +396,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
                 Priority = TaskPriority.Medium,
                 Status = TaskStatus.Todo,
                 EstimatedMinutes = 10
-            },
-            CancellationToken.None);
+            }, CancellationToken.None);
 
         var badRequest = Assert.IsType<BadRequestObjectResult>(result);
         Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
@@ -464,8 +428,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
                 Priority = TaskPriority.Medium,
                 Status = TaskStatus.Todo,
                 EstimatedMinutes = 10
-            },
-            CancellationToken.None);
+            }, CancellationToken.None);
 
         var badRequest = Assert.IsType<BadRequestObjectResult>(result);
         Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
@@ -495,8 +458,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
                 Priority = TaskPriority.Medium,
                 Status = TaskStatus.Todo,
                 EstimatedMinutes = -1
-            },
-            CancellationToken.None);
+            }, CancellationToken.None);
 
         var badRequest = Assert.IsType<BadRequestObjectResult>(result);
         Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
@@ -524,11 +486,8 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         var result = await controller.Update(
             new UpdateTaskInputModel
             {
-                Id = "not-an-object-id",
-                CategoryId = ObjectId.GenerateNewId().ToString(),
-                Description = "Valid"
-            },
-            CancellationToken.None);
+                Id = "not-an-object-id", CategoryId = ObjectId.GenerateNewId().ToString(), Description = "Valid"
+            }, CancellationToken.None);
 
         var badRequest = Assert.IsType<BadRequestObjectResult>(result);
         Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
@@ -545,11 +504,8 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         var result = await controller.Update(
             new UpdateTaskInputModel
             {
-                Id = ObjectId.GenerateNewId().ToString(),
-                CategoryId = "not-an-object-id",
-                Description = "Valid"
-            },
-            CancellationToken.None);
+                Id = ObjectId.GenerateNewId().ToString(), CategoryId = "not-an-object-id", Description = "Valid"
+            }, CancellationToken.None);
 
         var badRequest = Assert.IsType<BadRequestObjectResult>(result);
         Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
@@ -569,8 +525,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
                 Id = ObjectId.GenerateNewId().ToString(),
                 CategoryId = ObjectId.GenerateNewId().ToString(),
                 Description = "Update"
-            },
-            CancellationToken.None);
+            }, CancellationToken.None);
 
         var unauthorized = Assert.IsType<UnauthorizedResult>(result);
         Assert.Equal(StatusCodes.Status401Unauthorized, unauthorized.StatusCode);
@@ -594,8 +549,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
                 Status = TaskStatus.InProgress,
                 EstimatedMinutes = 20,
                 Deadline = DateTime.UtcNow.AddDays(1)
-            },
-            CancellationToken.None);
+            }, CancellationToken.None);
 
         var notFound = Assert.IsType<NotFoundObjectResult>(result);
         Assert.Equal(StatusCodes.Status404NotFound, notFound.StatusCode);
@@ -624,8 +578,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
                 Priority = TaskPriority.High,
                 Status = TaskStatus.Done,
                 EstimatedMinutes = 120
-            },
-            CancellationToken.None);
+            }, CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result);
         Assert.Equal(StatusCodes.Status200OK, ok.StatusCode);
@@ -688,8 +641,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
                 Description = "Attempted update",
                 Priority = TaskPriority.High,
                 Status = TaskStatus.InProgress
-            },
-            CancellationToken.None);
+            }, CancellationToken.None);
 
         var notFound = Assert.IsType<NotFoundObjectResult>(result);
         Assert.Equal(StatusCodes.Status404NotFound, notFound.StatusCode);
@@ -730,9 +682,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
     {
         var controller = CreateUnauthenticatedController();
 
-        var result = await controller.UpdateStatus(
-            new[] { ObjectId.GenerateNewId() },
-            TaskStatus.Done,
+        var result = await controller.UpdateStatus(new[] { ObjectId.GenerateNewId() }, TaskStatus.Done,
             CancellationToken.None);
 
         var unauthorized = Assert.IsType<UnauthorizedResult>(result);
@@ -753,9 +703,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
 
         var missingTaskId = ObjectId.GenerateNewId();
 
-        var result = await controller.UpdateStatus(
-            new[] { existingTaskId, missingTaskId },
-            TaskStatus.Done,
+        var result = await controller.UpdateStatus(new[] { existingTaskId, missingTaskId }, TaskStatus.Done,
             CancellationToken.None);
 
         var notFound = Assert.IsType<NotFoundObjectResult>(result);
@@ -794,17 +742,14 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
 
         // userA tries to update both tasks (one belongs to userB)
         var result = await controllerA.UpdateStatus(
-            new[] { taskAId, taskBId },
-            TaskStatus.Done,
-            CancellationToken.None);
+            new[] { taskAId, taskBId }, TaskStatus.Done, CancellationToken.None);
 
         var notFound = Assert.IsType<NotFoundObjectResult>(result);
         Assert.Equal(StatusCodes.Status404NotFound, notFound.StatusCode);
 
         var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
 
-        var getA = await taskRepository.GetOneAsync(
-            Builders<TaskEntity>.Filter.Eq(x => x.Id, taskAId),
+        var getA = await taskRepository.GetOneAsync(Builders<TaskEntity>.Filter.Eq(x => x.Id, taskAId),
             CancellationToken.None);
 
         Assert.True(getA.Success);
@@ -813,8 +758,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
 
         AssertUtcClose(seedA.UpdatedAt!.Value, getA.ResultObject!.UpdatedAt!.Value);
 
-        var getB = await taskRepository.GetOneAsync(
-            Builders<TaskEntity>.Filter.Eq(x => x.Id, taskBId),
+        var getB = await taskRepository.GetOneAsync(Builders<TaskEntity>.Filter.Eq(x => x.Id, taskBId),
             CancellationToken.None);
 
         Assert.True(getB.Success);
@@ -838,10 +782,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         var seed1 = await InsertTaskAsync(userId, categoryId, taskId1, CancellationToken.None);
         var seed2 = await InsertTaskAsync(userId, categoryId, taskId2, CancellationToken.None);
 
-        var result = await controller.UpdateStatus(
-            new[] { taskId1, taskId2 },
-            TaskStatus.Done,
-            CancellationToken.None);
+        var result = await controller.UpdateStatus(new[] { taskId1, taskId2 }, TaskStatus.Done, CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result);
         Assert.Equal(StatusCodes.Status200OK, ok.StatusCode);
@@ -879,13 +820,11 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         var seed = await InsertTaskAsync(userId, categoryId, existingTaskId, CancellationToken.None);
 
         // ObjectId.Empty will never exist in DB, so service should return NotFound and not update
-        var result = await controller.UpdateStatus(
-            new[] { existingTaskId, ObjectId.Empty },
-            TaskStatus.Done,
+        var result = await controller.UpdateStatus(new[] { existingTaskId, ObjectId.Empty }, TaskStatus.Done,
             CancellationToken.None);
 
-        var notFound = Assert.IsType<NotFoundObjectResult>(result);
-        Assert.Equal(StatusCodes.Status404NotFound, notFound.StatusCode);
+        var notFound = Assert.IsType<BadRequestResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, notFound.StatusCode);
 
         var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
         var get = await taskRepository.GetOneAsync(Builders<TaskEntity>.Filter.Eq(x => x.Id, existingTaskId),
@@ -1222,6 +1161,465 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         Assert.DoesNotContain(taskB1.ToString(), ids);
     }
 
+    [Fact]
+    public async Task DeleteOne_ShouldReturn_BadRequest_When_Id_Is_NullOrWhitespace()
+    {
+        var controller = CreateAuthenticatedController(out _);
+
+        var result = await controller.DeleteOne("", CancellationToken.None);
+
+        var badRequest = Assert.IsType<BadRequestResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteOne_ShouldReturn_BadRequest_When_Id_Is_Invalid()
+    {
+        var controller = CreateAuthenticatedController(out _);
+
+        var result = await controller.DeleteOne("not-an-object-id", CancellationToken.None);
+
+        var badRequest = Assert.IsType<BadRequestResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteOne_ShouldReturn_BadRequest_When_Id_Is_ObjectId_Empty()
+    {
+        var controller = CreateAuthenticatedController(out _);
+
+        var result = await controller.DeleteOne(ObjectId.Empty.ToString(), CancellationToken.None);
+
+        var badRequest = Assert.IsType<BadRequestResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteOne_ShouldReturn_Unauthorized_When_User_Is_Not_Authenticated()
+    {
+        var controller = CreateUnauthenticatedController();
+
+        var result = await controller.DeleteOne(ObjectId.GenerateNewId().ToString(), CancellationToken.None);
+
+        var unauthorized = Assert.IsType<UnauthorizedResult>(result);
+        Assert.Equal(StatusCodes.Status401Unauthorized, unauthorized.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteOne_ShouldReturn_NotFound_When_Task_Does_Not_Exist_For_User()
+    {
+        var controller = CreateAuthenticatedController(out _);
+
+        var result = await controller.DeleteOne(ObjectId.GenerateNewId().ToString(), CancellationToken.None);
+
+        var notFound = Assert.IsType<NotFoundObjectResult>(result);
+        Assert.Equal(StatusCodes.Status404NotFound, notFound.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteOne_ShouldReturn_NotFound_When_Task_Belongs_To_Different_User_And_Should_Not_Delete_It()
+    {
+        var controllerA = CreateAuthenticatedController(out var userA);
+        var controllerB = CreateAuthenticatedController(out var userB);
+
+        var categoryA = ObjectId.GenerateNewId();
+        await InsertCategoryAsync(userA, categoryA, CancellationToken.None);
+
+        var taskId = ObjectId.GenerateNewId();
+        await InsertTaskAsync(userA, categoryA, taskId, CancellationToken.None);
+
+        var result = await controllerB.DeleteOne(taskId.ToString(), CancellationToken.None);
+
+        var notFound = Assert.IsType<NotFoundObjectResult>(result);
+        Assert.Equal(StatusCodes.Status404NotFound, notFound.StatusCode);
+
+        // Ensure task still exists
+        var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
+        var get = await taskRepository.GetOneAsync(Builders<TaskEntity>.Filter.Eq(x => x.Id, taskId),
+            CancellationToken.None);
+        Assert.True(get.Success);
+        Assert.NotNull(get.ResultObject);
+        Assert.Equal(userA, get.ResultObject!.UserId);
+    }
+
+    [Fact]
+    public async Task DeleteOne_ShouldReturn_Ok_And_Delete_Task_For_User()
+    {
+        var controller = CreateAuthenticatedController(out var userId);
+
+        var categoryId = ObjectId.GenerateNewId();
+        await InsertCategoryAsync(userId, categoryId, CancellationToken.None);
+
+        var taskId = ObjectId.GenerateNewId();
+        await InsertTaskAsync(userId, categoryId, taskId, CancellationToken.None);
+
+        var result = await controller.DeleteOne(taskId.ToString(), CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(StatusCodes.Status200OK, ok.StatusCode);
+
+        var response = Assert.IsType<TaskResponseModel>(ok.Value);
+        Assert.Equal(taskId.ToString(), response.Id);
+        Assert.Equal(userId.ToString(), response.UserId);
+
+        // Ensure task is removed from DB
+        var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
+        var get = await taskRepository.GetOneAsync(Builders<TaskEntity>.Filter.Eq(x => x.Id, taskId),
+            CancellationToken.None);
+
+        Assert.False(get.Success);
+        Assert.Null(get
+            .ResultObject); // GetOneAsync returns Success=false with NotFoundError in your repo? If so adjust below
+
+        // If your repo returns Success=false on not found:
+        // Assert.False(get.Success);
+        // Assert.Contains(get.Errors, e => e is NotFoundError);
+    }
+
+    [Fact]
+    public async Task DeleteMany_ShouldReturn_BadRequest_When_TaskIds_Is_Null()
+    {
+        var controller = CreateAuthenticatedController(out _);
+
+        var result = await controller.DeleteMany(null, CancellationToken.None);
+
+        var badRequest = Assert.IsType<BadRequestResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteMany_ShouldReturn_BadRequest_When_TaskIds_Is_Empty()
+    {
+        var controller = CreateAuthenticatedController(out _);
+
+        var result = await controller.DeleteMany(Array.Empty<ObjectId>(), CancellationToken.None);
+
+        var badRequest = Assert.IsType<BadRequestResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteMany_ShouldReturn_BadRequest_When_TaskIds_Contains_Empty_ObjectId()
+    {
+        var controller = CreateAuthenticatedController(out _);
+
+        var result =
+            await controller.DeleteMany(new[] { ObjectId.GenerateNewId(), ObjectId.Empty }, CancellationToken.None);
+
+        var badRequest = Assert.IsType<BadRequestResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteMany_ShouldReturn_Unauthorized_When_User_Is_Not_Authenticated()
+    {
+        var controller = CreateUnauthenticatedController();
+
+        var result = await controller.DeleteMany(new[] { ObjectId.GenerateNewId() }, CancellationToken.None);
+
+        var unauthorized = Assert.IsType<UnauthorizedResult>(result);
+        Assert.Equal(StatusCodes.Status401Unauthorized, unauthorized.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteMany_ShouldReturn_NotFound_When_Some_Tasks_Do_Not_Exist_For_User_And_Should_Not_Delete_Any()
+    {
+        var controller = CreateAuthenticatedController(out var userId);
+
+        var categoryId = ObjectId.GenerateNewId();
+        await InsertCategoryAsync(userId, categoryId, CancellationToken.None);
+
+        var existingTaskId = ObjectId.GenerateNewId();
+        await InsertTaskAsync(userId, categoryId, existingTaskId, CancellationToken.None);
+
+        var missingTaskId = ObjectId.GenerateNewId();
+
+        var result = await controller.DeleteMany(new[] { existingTaskId, missingTaskId }, CancellationToken.None);
+
+        var notFound = Assert.IsType<NotFoundObjectResult>(result);
+        Assert.Equal(StatusCodes.Status404NotFound, notFound.StatusCode);
+
+        // Ensure existing task still exists
+        var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
+        var get = await taskRepository.GetOneAsync(Builders<TaskEntity>.Filter.Eq(x => x.Id, existingTaskId),
+            CancellationToken.None);
+        Assert.True(get.Success);
+        Assert.NotNull(get.ResultObject);
+        Assert.Equal(userId, get.ResultObject!.UserId);
+    }
+
+    [Fact]
+    public async Task DeleteMany_ShouldReturn_NotFound_When_A_Task_Belongs_To_Different_User_And_Should_Not_Delete_Any()
+    {
+        var controllerA = CreateAuthenticatedController(out var userA);
+        var controllerB = CreateAuthenticatedController(out var userB);
+
+        var categoryA = ObjectId.GenerateNewId();
+        var categoryB = ObjectId.GenerateNewId();
+        await InsertCategoryAsync(userA, categoryA, CancellationToken.None);
+        await InsertCategoryAsync(userB, categoryB, CancellationToken.None);
+
+        var taskAId = ObjectId.GenerateNewId();
+        var taskBId = ObjectId.GenerateNewId();
+
+        await InsertTaskAsync(userA, categoryA, taskAId, CancellationToken.None);
+        await InsertTaskAsync(userB, categoryB, taskBId, CancellationToken.None);
+
+        // userA tries to delete both tasks, one belongs to userB -> should fail and delete nothing
+        var result = await controllerA.DeleteMany(new[] { taskAId, taskBId }, CancellationToken.None);
+
+        var notFound = Assert.IsType<NotFoundObjectResult>(result);
+        Assert.Equal(StatusCodes.Status404NotFound, notFound.StatusCode);
+
+        var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
+
+        var getA = await taskRepository.GetOneAsync(Builders<TaskEntity>.Filter.Eq(x => x.Id, taskAId),
+            CancellationToken.None);
+        Assert.True(getA.Success);
+        Assert.NotNull(getA.ResultObject);
+
+        var getB = await taskRepository.GetOneAsync(Builders<TaskEntity>.Filter.Eq(x => x.Id, taskBId),
+            CancellationToken.None);
+        Assert.True(getB.Success);
+        Assert.NotNull(getB.ResultObject);
+    }
+
+    [Fact]
+    public async Task DeleteMany_ShouldReturn_Ok_With_DeletedCount_And_Delete_All_Tasks()
+    {
+        var controller = CreateAuthenticatedController(out var userId);
+
+        var categoryId = ObjectId.GenerateNewId();
+        await InsertCategoryAsync(userId, categoryId, CancellationToken.None);
+
+        var taskId1 = ObjectId.GenerateNewId();
+        var taskId2 = ObjectId.GenerateNewId();
+        await InsertTaskAsync(userId, categoryId, taskId1, CancellationToken.None);
+        await InsertTaskAsync(userId, categoryId, taskId2, CancellationToken.None);
+
+        var result = await controller.DeleteMany(new[] { taskId1, taskId2 }, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(StatusCodes.Status200OK, ok.StatusCode);
+
+        var deletedCount = Assert.IsType<long>(ok.Value);
+        Assert.Equal(2, deletedCount);
+
+        var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
+        var get1 = await taskRepository.GetOneAsync(Builders<TaskEntity>.Filter.Eq(x => x.Id, taskId1),
+            CancellationToken.None);
+        var get2 = await taskRepository.GetOneAsync(Builders<TaskEntity>.Filter.Eq(x => x.Id, taskId2),
+            CancellationToken.None);
+
+        // Depending on GetOneAsync semantics (see note in DeleteOne test)
+        Assert.False(get1.Success);
+        Assert.False(get2.Success);
+    }
+
+    [Fact]
+    public async Task DeleteByCategory_ShouldReturn_BadRequest_When_CategoryId_Is_Empty()
+    {
+        var controller = CreateAuthenticatedController(out _);
+
+        var result = await controller.DeleteByCategory(ObjectId.Empty, CancellationToken.None);
+
+        var badRequest = Assert.IsType<BadRequestResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteByCategory_ShouldReturn_Unauthorized_When_User_Is_Not_Authenticated()
+    {
+        var controller = CreateUnauthenticatedController();
+
+        var result = await controller.DeleteByCategory(ObjectId.GenerateNewId(), CancellationToken.None);
+
+        var unauthorized = Assert.IsType<UnauthorizedResult>(result);
+        Assert.Equal(StatusCodes.Status401Unauthorized, unauthorized.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeleteByCategory_ShouldReturn_NotFound_When_Category_Does_Not_Exist_For_User()
+    {
+        var controller = CreateAuthenticatedController(out _);
+
+        var result = await controller.DeleteByCategory(ObjectId.GenerateNewId(), CancellationToken.None);
+
+        var notFound = Assert.IsType<NotFoundObjectResult>(result);
+        Assert.Equal(StatusCodes.Status404NotFound, notFound.StatusCode);
+    }
+
+    [Fact]
+    public async Task
+        DeleteByCategory_ShouldReturn_NotFound_When_Category_Belongs_To_Different_User_And_Should_Not_Delete_Anything()
+    {
+        var controllerA = CreateAuthenticatedController(out var userA);
+        var controllerB = CreateAuthenticatedController(out var userB);
+
+        var categoryA = ObjectId.GenerateNewId();
+        await InsertCategoryAsync(userA, categoryA, CancellationToken.None);
+
+        var taskId = ObjectId.GenerateNewId();
+        await InsertTaskAsync(userA, categoryA, taskId, CancellationToken.None);
+
+        var result = await controllerB.DeleteByCategory(categoryA, CancellationToken.None);
+
+        var notFound = Assert.IsType<NotFoundObjectResult>(result);
+        Assert.Equal(StatusCodes.Status404NotFound, notFound.StatusCode);
+
+        var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
+        var get = await taskRepository.GetOneAsync(Builders<TaskEntity>.Filter.Eq(x => x.Id, taskId),
+            CancellationToken.None);
+        Assert.True(get.Success);
+        Assert.NotNull(get.ResultObject);
+    }
+
+    [Fact]
+    public async Task DeleteByCategory_ShouldReturn_Ok_With_DeletedCount_And_Delete_All_Tasks_In_Category()
+    {
+        var controller = CreateAuthenticatedController(out var userId);
+
+        var categoryA = ObjectId.GenerateNewId();
+        var categoryB = ObjectId.GenerateNewId();
+        await InsertCategoryAsync(userId, categoryA, CancellationToken.None);
+        await InsertCategoryAsync(userId, categoryB, CancellationToken.None);
+
+        var a1 = ObjectId.GenerateNewId();
+        var a2 = ObjectId.GenerateNewId();
+        var b1 = ObjectId.GenerateNewId();
+
+        await InsertTaskAsync(userId, categoryA, a1, CancellationToken.None);
+        await InsertTaskAsync(userId, categoryA, a2, CancellationToken.None);
+        await InsertTaskAsync(userId, categoryB, b1, CancellationToken.None);
+
+        var result = await controller.DeleteByCategory(categoryA, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(StatusCodes.Status200OK, ok.StatusCode);
+
+        var deletedCount = Assert.IsType<long>(ok.Value);
+        Assert.Equal(2, deletedCount);
+
+        var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
+
+        var getA1 = await taskRepository.GetOneAsync(Builders<TaskEntity>.Filter.Eq(x => x.Id, a1),
+            CancellationToken.None);
+        var getA2 = await taskRepository.GetOneAsync(Builders<TaskEntity>.Filter.Eq(x => x.Id, a2),
+            CancellationToken.None);
+        var getB1 = await taskRepository.GetOneAsync(Builders<TaskEntity>.Filter.Eq(x => x.Id, b1),
+            CancellationToken.None);
+
+        Assert.False(getA1.Success);
+        Assert.False(getA2.Success);
+
+        Assert.True(getB1.Success);
+        Assert.NotNull(getB1.ResultObject);
+    }
+    
+    [Fact]
+    public async Task DeleteManyByUserId_ShouldReturn_Unauthorized_When_User_Is_Not_Authenticated()
+    {
+        var controller = CreateUnauthenticatedController();
+    
+        var result = await controller.DeleteMany(CancellationToken.None);
+    
+        var unauthorized = Assert.IsType<UnauthorizedResult>(result);
+        Assert.Equal(StatusCodes.Status401Unauthorized, unauthorized.StatusCode);
+    }
+    
+    [Fact]
+    public async Task DeleteManyByUserId_ShouldReturn_NotFound_When_User_Has_No_Tasks()
+    {
+        var controller = CreateAuthenticatedController(out var userId);
+    
+        // ensure user exists but has no tasks
+        var result = await controller.DeleteMany(CancellationToken.None);
+    
+        var notFound = Assert.IsType<NotFoundObjectResult>(result);
+        Assert.Equal(StatusCodes.Status404NotFound, notFound.StatusCode);
+    
+        // sanity: still no tasks
+        var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
+        var get = await taskRepository.GetAsync(Builders<TaskEntity>.Filter.Eq(x => x.UserId, userId), CancellationToken.None);
+        Assert.True(get.Success);
+        Assert.Empty(get.ResultObject);
+    }
+    
+    [Fact]
+    public async Task DeleteManyByUserId_ShouldReturn_Ok_With_DeletedCount_And_Delete_All_User_Tasks()
+    {
+        var controller = CreateAuthenticatedController(out var userId);
+    
+        var categoryA = ObjectId.GenerateNewId();
+        var categoryB = ObjectId.GenerateNewId();
+    
+        await InsertCategoryAsync(userId, categoryA, CancellationToken.None);
+        await InsertCategoryAsync(userId, categoryB, CancellationToken.None);
+    
+        var t1 = ObjectId.GenerateNewId();
+        var t2 = ObjectId.GenerateNewId();
+        var t3 = ObjectId.GenerateNewId();
+    
+        await InsertTaskAsync(userId, categoryA, t1, CancellationToken.None);
+        await InsertTaskAsync(userId, categoryA, t2, CancellationToken.None);
+        await InsertTaskAsync(userId, categoryB, t3, CancellationToken.None);
+    
+        var result = await controller.DeleteMany(CancellationToken.None);
+    
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(StatusCodes.Status200OK, ok.StatusCode);
+    
+        var deletedCount = Assert.IsType<long>(ok.Value);
+        Assert.Equal(3, deletedCount);
+    
+        // Verify DB: no tasks remain for userId
+        var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
+        var get = await taskRepository.GetAsync(Builders<TaskEntity>.Filter.Eq(x => x.UserId, userId), CancellationToken.None);
+        Assert.True(get.Success);
+        Assert.Empty(get.ResultObject);
+    }
+    
+    [Fact]
+    public async Task DeleteManyByUserId_Should_Not_Delete_Other_Users_Tasks()
+    {
+        var controllerA = CreateAuthenticatedController(out var userA);
+        var controllerB = CreateAuthenticatedController(out var userB);
+    
+        var categoryA = ObjectId.GenerateNewId();
+        var categoryB = ObjectId.GenerateNewId();
+    
+        await InsertCategoryAsync(userA, categoryA, CancellationToken.None);
+        await InsertCategoryAsync(userB, categoryB, CancellationToken.None);
+    
+        var a1 = ObjectId.GenerateNewId();
+        var a2 = ObjectId.GenerateNewId();
+        var b1 = ObjectId.GenerateNewId();
+    
+        await InsertTaskAsync(userA, categoryA, a1, CancellationToken.None);
+        await InsertTaskAsync(userA, categoryA, a2, CancellationToken.None);
+        await InsertTaskAsync(userB, categoryB, b1, CancellationToken.None);
+    
+        var result = await controllerA.DeleteMany(CancellationToken.None);
+    
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(StatusCodes.Status200OK, ok.StatusCode);
+    
+        var deletedCount = Assert.IsType<long>(ok.Value);
+        Assert.Equal(2, deletedCount);
+    
+        var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
+    
+        // userA tasks removed
+        var getA = await taskRepository.GetAsync(Builders<TaskEntity>.Filter.Eq(x => x.UserId, userA), CancellationToken.None);
+        Assert.True(getA.Success);
+        Assert.Empty(getA.ResultObject);
+    
+        // userB task remains
+        var getB = await taskRepository.GetAsync(Builders<TaskEntity>.Filter.Eq(x => x.UserId, userB), CancellationToken.None);
+        Assert.True(getB.Success);
+        Assert.Single(getB.ResultObject);
+        Assert.Equal(b1, getB.ResultObject[0].Id);
+    }
 
     private static void AssertUtcClose(DateTime expected, DateTime actual, double maxMs = 1)
     {

@@ -52,7 +52,16 @@ public interface ICategoryService
     /// <param name="userId">Identifier of the user owning the category</param>
     /// <param name="cancellationToken">An instance of <see cref="CancellationToken"/></param>
     /// <returns><see cref="OperationResult"/> with result object containing the deleted category</returns>
-    Task<OperationResult<Category>> DeleteCategory(string categoryId, ObjectId userId, CancellationToken cancellationToken);
+    Task<OperationResult<Category>> DeleteCategory(ObjectId categoryId, ObjectId userId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Deletes all categories belonging to the specified user
+    /// </summary>
+    /// <param name="categoryIds">Identifiers of the categories</param>
+    /// <param name="userId">Identifier of the user owning the categories</param>
+    /// <param name="cancellationToken">An instance of <see cref="CancellationToken"/></param>
+    /// <returns><see cref="OperationResult"/> with result object containing the count of deleted categories</returns>
+    Task<OperationResult<long>> DeleteCategories(ObjectId[] categoryIds, ObjectId userId, CancellationToken cancellationToken);
     
     /// <summary>
     /// Deletes all categories belonging to the specified user

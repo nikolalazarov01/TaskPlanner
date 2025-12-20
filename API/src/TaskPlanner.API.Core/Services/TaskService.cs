@@ -250,4 +250,84 @@ public class TaskService : ITaskService
     
         return result.WithRelatedObject(get.ResultObject ?? Array.Empty<Data.Models.Task>());
     }
+
+    /// <inheritdoc/>
+    public async Task<OperationResult<Data.Models.Task>> DeleteOne(ObjectId taskId, ObjectId userId, CancellationToken cancellationToken)
+    {
+        var result = new OperationResult<Data.Models.Task>();
+
+        if (userId == ObjectId.Empty) return result.AppendError("Invalid user id.");
+
+        var filter = Builders<Data.Models.Task>.Filter.And(
+            Builders<Data.Models.Task>.Filter.Eq(x => x.Id, taskId),
+            Builders<Data.Models.Task>.Filter.Eq(x => x.UserId, userId));
+
+        return await _taskRepository.DeleteOneAsync(filter, cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    public async Task<OperationResult<long>> DeleteMany(ObjectId[] taskIds, ObjectId userId, CancellationToken cancellationToken)
+    {
+        var operationResult = new OperationResult<long>();
+
+        if (userId == ObjectId.Empty) return operationResult.AppendError("Invalid user id.");
+
+        var existsFilter = Builders<Data.Models.Task>.Filter.And(
+            Builders<Data.Models.Task>.Filter.Eq(x => x.UserId, userId),
+            Builders<Data.Models.Task>.Filter.In(x => x.Id, taskIds));
+
+        var existing = await _taskRepository.GetAsync(existsFilter, cancellationToken);
+        if (!existing.Success) return operationResult.AppendErrors(existing);
+
+        var foundCount = existing.ResultObject?.Count ?? 0;
+        if (foundCount != taskIds.Length)
+        {
+            var existingIds = existing.ResultObject?.Select(x => x.Id).ToHashSet() ?? new HashSet<ObjectId>();
+            var missing = taskIds.Where(x => !existingIds.Contains(x)).ToList();
+
+            operationResult.AppendError(new NotFoundError($"Some tasks were not found: {string.Join(", ", missing)}"));
+            return operationResult;
+        }
+
+        var delete = await _taskRepository.DeleteManyAsync(existsFilter, cancellationToken);
+        if (!delete.Success) return operationResult.AppendErrors(delete);
+
+        return operationResult.WithRelatedObject(delete.ResultObject);
+    }
+    
+    /// <inheritdoc/>
+    public async Task<OperationResult<long>> DeleteMany(ObjectId userId, CancellationToken cancellationToken)
+    {
+        var filter = Builders<Data.Models.Task>.Filter.Eq(x => x.UserId, userId);
+
+        return await _taskRepository.DeleteManyAsync(filter, cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    public async Task<OperationResult<long>> DeleteByCategoryId(ObjectId categoryId, ObjectId userId, CancellationToken cancellationToken)
+    {
+        var operationResult = new OperationResult<long>();
+
+        if (userId == ObjectId.Empty) return operationResult.AppendError("Invalid user id.");
+
+        var categoryFilter = Builders<Category>.Filter.And(Builders<Category>.Filter.Eq(x => x.Id, categoryId),
+            Builders<Category>.Filter.Eq(x => x.UserId, userId));
+
+        var categoryExists = await _categoryRepository.AnyAsync(categoryFilter, cancellationToken);
+        if (!categoryExists.Success) return operationResult.AppendErrors(categoryExists);
+
+        if (!categoryExists.ResultObject)
+        {
+            operationResult.AppendError(new NotFoundError($"Category with id {categoryId} not found."));
+            return operationResult;
+        }
+
+        var filter = Builders<Data.Models.Task>.Filter.And(Builders<Data.Models.Task>.Filter.Eq(x => x.UserId, userId),
+            Builders<Data.Models.Task>.Filter.Eq(x => x.CategoryId, categoryId));
+
+        var delete = await _taskRepository.DeleteManyAsync(filter, cancellationToken);
+        if (!delete.Success) return operationResult.AppendErrors(delete);
+
+        return operationResult.WithRelatedObject(delete.ResultObject);
+    }
 }

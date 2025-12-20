@@ -251,10 +251,155 @@ public class TaskController : ControllerBase
     }
 
 
-    [HttpDelete]
-    public IActionResult Delete([FromQuery] string entityId)
+        /// <summary>
+    /// Delete - Task
+    /// </summary>
+    /// <param name="id">The identifier of the task to delete.</param>
+    /// <param name="cancellationToken">The <see cref="CancellationToken"/> used to propagate notifications that the operation should be cancelled.</param>
+    /// <returns>
+    /// Returns the deleted task as <see cref="TaskResponseModel"/> if the request is successful.
+    /// </returns>
+    /// <remarks>
+    /// Deletes a single task for the authenticated user.
+    /// The authenticated user id is extracted from the request context.
+    /// The task must exist and belong to the authenticated user.
+    /// </remarks>
+    /// <response code="200">Returns the deleted task</response>
+    /// <response code="400">The request is invalid or an error occurred during deletion</response>
+    /// <response code="401">The request is unauthorized</response>
+    /// <response code="404">The specified task was not found</response>
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> DeleteOne([FromRoute] string id, CancellationToken cancellationToken)
     {
-        return StatusCode(StatusCodes.Status501NotImplemented);
+        if (string.IsNullOrWhiteSpace(id)) return BadRequest();
+        if (!ObjectId.TryParse(id, out var taskId) || taskId == ObjectId.Empty) return BadRequest();
+
+        if (!this.TryGetUserObjectId(out var userId)) return Unauthorized();
+
+        var deleteResult = await _taskService.DeleteOne(taskId, userId, cancellationToken);
+
+        if (!deleteResult.Success)
+        {
+            if (deleteResult.Errors.Any(e => e is NotFoundError))
+                return NotFound(deleteResult.Errors);
+
+            return BadRequest(deleteResult.Errors);
+        }
+
+        var deleted = deleteResult.ResultObject;
+        if (deleted is null) return NotFound();
+
+        var response = _mapper.Map<TaskResponseModel>(deleted);
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// Delete - Tasks
+    /// </summary>
+    /// <param name="taskIds">The identifiers of the tasks to delete.</param>
+    /// <param name="cancellationToken">The <see cref="CancellationToken"/> used to propagate notifications that the operation should be cancelled.</param>
+    /// <returns>
+    /// Returns the number of deleted tasks if the request is successful.
+    /// </returns>
+    /// <remarks>
+    /// Deletes multiple tasks for the authenticated user in a single operation.
+    /// The authenticated user id is extracted from the request context.
+    /// All provided task ids must exist and belong to the authenticated user; otherwise no deletions are applied.
+    /// </remarks>
+    /// <response code="200">Returns the number of deleted tasks</response>
+    /// <response code="400">The input is invalid or an error occurred during deletion</response>
+    /// <response code="401">The request is unauthorized</response>
+    /// <response code="404">One or more tasks were not found</response>
+    [HttpDelete("many")]
+    public async Task<IActionResult> DeleteMany([FromQuery] ObjectId[] taskIds, CancellationToken cancellationToken)
+    {
+        if (taskIds is null || taskIds.Length == 0) return BadRequest();
+        if (taskIds.Any(x => x == ObjectId.Empty)) return BadRequest();
+
+        if (!this.TryGetUserObjectId(out var userId)) return Unauthorized();
+
+        var deleteResult = await _taskService.DeleteMany(taskIds, userId, cancellationToken);
+
+        if (!deleteResult.Success)
+        {
+            if (deleteResult.Errors.Any(e => e is NotFoundError))
+                return NotFound(deleteResult.Errors);
+
+            return BadRequest(deleteResult.Errors);
+        }
+
+        return Ok(deleteResult.ResultObject);
+    }
+    
+    /// <summary>
+    /// Delete - Tasks for the current user
+    /// </summary>
+    /// <param name="cancellationToken">The <see cref="CancellationToken"/> used to propagate notifications that the operation should be cancelled.</param>
+    /// <returns>
+    /// Returns the number of deleted tasks if the request is successful.
+    /// </returns>
+    /// <remarks>
+    /// Deletes multiple tasks for the authenticated user in a single operation.
+    /// The authenticated user id is extracted from the request context.
+    /// All provided task ids must exist and belong to the authenticated user; otherwise no deletions are applied.
+    /// </remarks>
+    /// <response code="200">Returns the number of deleted tasks</response>
+    /// <response code="400">The input is invalid or an error occurred during deletion</response>
+    /// <response code="401">The request is unauthorized</response>
+    /// <response code="404">One or more tasks were not found</response>
+    [HttpDelete("by-user-id")]
+    public async Task<IActionResult> DeleteMany(CancellationToken cancellationToken)
+    {
+        if (!this.TryGetUserObjectId(out var userId)) return Unauthorized();
+
+        var deleteResult = await _taskService.DeleteMany(userId, cancellationToken);
+
+        if (!deleteResult.Success)
+        {
+            if (deleteResult.Errors.Any(e => e is NotFoundError))
+                return NotFound(deleteResult.Errors);
+
+            return BadRequest(deleteResult.Errors);
+        }
+
+        return Ok(deleteResult.ResultObject);
+    }
+
+    /// <summary>
+    /// Delete - Tasks by Category
+    /// </summary>
+    /// <param name="categoryId">The identifier of the category whose tasks should be deleted.</param>
+    /// <param name="cancellationToken">The <see cref="CancellationToken"/> used to propagate notifications that the operation should be cancelled.</param>
+    /// <returns>
+    /// Returns the number of deleted tasks if the request is successful.
+    /// </returns>
+    /// <remarks>
+    /// Deletes all tasks under the specified category for the authenticated user.
+    /// The authenticated user id is extracted from the request context.
+    /// The category must exist and belong to the authenticated user.
+    /// </remarks>
+    /// <response code="200">Returns the number of deleted tasks</response>
+    /// <response code="400">The input is invalid or an error occurred during deletion</response>
+    /// <response code="401">The request is unauthorized</response>
+    /// <response code="404">The category was not found</response>
+    [HttpDelete("by-category")]
+    public async Task<IActionResult> DeleteByCategory([FromQuery] ObjectId categoryId, CancellationToken cancellationToken)
+    {
+        if (categoryId == ObjectId.Empty) return BadRequest();
+
+        if (!this.TryGetUserObjectId(out var userId)) return Unauthorized();
+
+        var deleteResult = await _taskService.DeleteByCategoryId(categoryId, userId, cancellationToken);
+
+        if (!deleteResult.Success)
+        {
+            if (deleteResult.Errors.Any(e => e is NotFoundError))
+                return NotFound(deleteResult.Errors);
+
+            return BadRequest(deleteResult.Errors);
+        }
+
+        return Ok(deleteResult.ResultObject);
     }
     
     private async Task<IActionResult> UpdateTaskStatusesInternal(ObjectId[] taskIds, TaskStatus status, CancellationToken cancellationToken)

@@ -96,6 +96,12 @@ public class CategoryService : ICategoryService
     public async Task<OperationResult<Category>> DeleteCategory(ObjectId categoryId, ObjectId userId, CancellationToken cancellationToken)
     {
         var result = new OperationResult<Category>();
+        
+        if (categoryId == ObjectId.Empty)
+            return result.AppendError("Invalid category id.");
+
+        if (userId == ObjectId.Empty)
+            return result.AppendError("Invalid user id.");
 
         var filter = Builders<Category>.Filter.And(
             Builders<Category>.Filter.Eq(x => x.Id, categoryId),

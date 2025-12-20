@@ -115,4 +115,15 @@ public interface ITaskService
     /// <param name="cancellationToken">The <see cref="CancellationToken"/> used to propagate cancellation requests.</param>
     /// <returns>An <see cref="OperationResult{T}"/> containing the number of deleted tasks if the operation succeeds, or validation / not-found errors otherwise.</returns>
     Task<OperationResult<long>> DeleteByCategoryId(ObjectId categoryId, ObjectId userId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Deletes all tasks in the specified category for the given user.
+    /// 
+    /// The category must exist and belong to the given user; otherwise a not-found error is returned.
+    /// </summary>
+    /// <param name="categoryIds">The identifiers of the categories whose tasks should be deleted.</param>
+    /// <param name="userId">The identifier of the user who owns the category and tasks.</param>
+    /// <param name="cancellationToken">The <see cref="CancellationToken"/> used to propagate cancellation requests.</param>
+    /// <returns>An <see cref="OperationResult{T}"/> containing the number of deleted tasks if the operation succeeds, or validation / not-found errors otherwise.</returns>
+    Task<OperationResult<long>> DeleteByCategoryId(ObjectId[] categoryIds, ObjectId userId, CancellationToken cancellationToken);
 }

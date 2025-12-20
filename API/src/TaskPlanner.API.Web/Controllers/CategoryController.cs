@@ -213,7 +213,7 @@ public class CategoryController : ControllerBase
 
         if (!deleteCorrespondingTasks.Success)
         {
-            if (!deleteResult.Errors.Any(e => e is NotFoundError))
+            if (!deleteCorrespondingTasks.Errors.Any(e => e is NotFoundError))
                 return BadRequest(deleteResult.Errors);
         }
 
@@ -247,7 +247,16 @@ public class CategoryController : ControllerBase
     
         if (!this.TryGetUserObjectId(out var userId)) return Unauthorized();
     
-        // delete categories first (source of truth for which categories were deleted)
+        var deleteCorrespondingTasks = await _taskService.DeleteByCategoryId(categoryIds, userId, cancellationToken);
+    
+        if (!deleteCorrespondingTasks.Success)
+        {
+            // keep same pattern you used above:
+            // only surface errors if it is NOT a NotFoundError (i.e. if something actually failed)
+            if (!deleteCorrespondingTasks.Errors.Any(e => e is NotFoundError))
+                return BadRequest(deleteCorrespondingTasks.Errors);
+        }
+        
         var deleteResult = await _categoryService.DeleteCategories(categoryIds, userId, cancellationToken);
     
         if (!deleteResult.Success)
@@ -257,18 +266,7 @@ public class CategoryController : ControllerBase
     
             return BadRequest(deleteResult.Errors);
         }
-    
-        // cascade delete tasks for those categories
-        var deleteCorrespondingTasks = await _taskService.DeleteMany(categoryIds, userId, cancellationToken);
-    
-        if (!deleteCorrespondingTasks.Success)
-        {
-            // keep same pattern you used above:
-            // only surface errors if it is NOT a NotFoundError (i.e. if something actually failed)
-            if (!deleteCorrespondingTasks.Errors.Any(e => e is NotFoundError))
-                return BadRequest(deleteCorrespondingTasks.Errors);
-        }
-    
+        
         return Ok(deleteResult.ResultObject);
     }
     
@@ -303,7 +301,7 @@ public class CategoryController : ControllerBase
 
         if (!deleteCorrespondingTasks.Success)
         {
-            if (!deleteResult.Errors.Any(e => e is NotFoundError))
+            if (!deleteCorrespondingTasks.Errors.Any(e => e is NotFoundError))
                 return BadRequest(deleteResult.Errors);
         }
 

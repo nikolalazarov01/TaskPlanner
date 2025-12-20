@@ -330,4 +330,46 @@ public class TaskService : ITaskService
 
         return operationResult.WithRelatedObject(delete.ResultObject);
     }
+    
+    public async Task<OperationResult<long>> DeleteByCategoryId(ObjectId[] categoryIds, ObjectId userId, CancellationToken cancellationToken)
+    {
+        var result = new OperationResult<long>();
+    
+        if (userId == ObjectId.Empty)
+            return result.AppendError("Invalid user id.");
+    
+        if (categoryIds is null || categoryIds.Length == 0)
+            return result.AppendError("No categories provided.");
+    
+        if (categoryIds.Any(x => x == ObjectId.Empty))
+            return result.AppendError("Invalid category id.");
+    
+        var categoryExistsFilter = Builders<Category>.Filter.And(
+            Builders<Category>.Filter.Eq(x => x.UserId, userId),
+            Builders<Category>.Filter.In(x => x.Id, categoryIds));
+    
+        var existingCategories = await _categoryRepository.GetAsync(categoryExistsFilter, cancellationToken);
+        if (!existingCategories.Success)
+            return result.AppendErrors(existingCategories);
+    
+        var foundCount = existingCategories.ResultObject?.Count ?? 0;
+        if (foundCount != categoryIds.Length)
+        {
+            var existingIds = existingCategories.ResultObject?.Select(x => x.Id).ToHashSet() ?? new HashSet<ObjectId>();
+            var missing = categoryIds.Where(id => !existingIds.Contains(id)).ToList();
+    
+            result.AppendError(new NotFoundError($"Some categories were not found: {string.Join(", ", missing)}"));
+            return result;
+        }
+    
+        var taskFilter = Builders<Data.Models.Task>.Filter.And(
+            Builders<Data.Models.Task>.Filter.Eq(x => x.UserId, userId),
+            Builders<Data.Models.Task>.Filter.In(x => x.CategoryId, categoryIds));
+    
+        var delete = await _taskRepository.DeleteManyAsync(taskFilter, cancellationToken);
+        if (!delete.Success)
+            return result.AppendErrors(delete);
+    
+        return result.WithRelatedObject(delete.ResultObject);
+    }
 }

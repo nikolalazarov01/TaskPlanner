@@ -4,8 +4,10 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MongoDB.Bson;
+using OneBitSoftware.Utilities;
 using TaskPlanner.API.Core.Interfaces;
 using TaskPlanner.API.Core.Models.Category;
+using TaskPlanner.API.Data.Interfaces;
 using TaskPlanner.API.Data.Models;
 using TaskPlanner.API.Utilities;
 using TaskPlanner.API.Web.Extensions;
@@ -24,6 +26,7 @@ public class CategoryController : ControllerBase
     private readonly ITaskService _taskService;
     private readonly IValidator<CategoryInputModel> _categoryRequestValidator;
     private readonly IValidator<UpdateCategoryInputModel> _updateCategoryRequestValidator;
+    private readonly ITransactionManagementUtility _transactionManagementUtility;
     private readonly IMapper _mapper;
     
     /// <summary>
@@ -34,12 +37,13 @@ public class CategoryController : ControllerBase
     /// <param name="categoryRequestValidator">Validator for <see cref="CategoryInputModel"/></param>
     /// <param name="updateCategoryRequestValidator">Validator for <see cref="UpdateCategoryInputModel"/></param>
     /// <param name="mapper">Mapper used to map entities to response models</param>
-    public CategoryController(ICategoryService categoryService, ITaskService taskService, IValidator<CategoryInputModel> categoryRequestValidator, IValidator<UpdateCategoryInputModel> updateCategoryRequestValidator, IMapper mapper)
+    public CategoryController(ICategoryService categoryService, ITaskService taskService, IValidator<CategoryInputModel> categoryRequestValidator, IValidator<UpdateCategoryInputModel> updateCategoryRequestValidator, IMapper mapper, ITransactionManagementUtility transactionManagementUtility)
     {
         _categoryService = categoryService;
         _taskService = taskService;
         _categoryRequestValidator = categoryRequestValidator;
         _mapper = mapper;
+        _transactionManagementUtility = transactionManagementUtility;
         _updateCategoryRequestValidator = updateCategoryRequestValidator;
     }
     
@@ -196,29 +200,7 @@ public class CategoryController : ControllerBase
 
         if (!this.TryGetUserObjectId(out var userId)) return Unauthorized();
 
-        var deleteResult = await _categoryService.DeleteCategory(id, userId, cancellationToken);
-
-        if (!deleteResult.Success)
-        {
-            if (deleteResult.Errors.Any(e => e is NotFoundError))
-                return NotFound(deleteResult.Errors);
-
-            return BadRequest(deleteResult.Errors);
-        }
-
-        var deleted = deleteResult.ResultObject;
-        if (deleted is null) return NotFound();
-        
-        var deleteCorrespondingTasks = await this._taskService.DeleteByCategoryId(id, userId, cancellationToken);
-
-        if (!deleteCorrespondingTasks.Success)
-        {
-            if (!deleteCorrespondingTasks.Errors.Any(e => e is NotFoundError))
-                return BadRequest(deleteResult.Errors);
-        }
-
-        var response = _mapper.Map<CategoryResponseModel>(deleted);
-        return Ok(response);
+        return await this.DeleteCategoryInternally(id, userId, cancellationToken);
     }
 
     /// <summary>
@@ -308,5 +290,30 @@ public class CategoryController : ControllerBase
 
         // returns deleted count
         return Ok(new { deletedCount = deleteResult.ResultObject });
+    }
+
+    private async Task<IActionResult> DeleteCategoryInternally(ObjectId id, ObjectId userId, CancellationToken cancellationToken)
+    {
+        var deleteCategory = await this._transactionManagementUtility.ExecuteInTransactionAsync(async () =>
+        {
+            var operationResult = new OperationResult();
+
+            var deleteResult = await _categoryService.DeleteCategory(id, userId, cancellationToken);
+
+            if (!deleteResult.Success) return operationResult.AppendErrors(deleteResult);
+
+            var deleted = deleteResult.ResultObject;
+            if (deleted is null) return operationResult.AppendError("Something went wrong");
+
+            var deleteCorrespondingTasks = await this._taskService.DeleteByCategoryId(id, userId, cancellationToken);
+
+            if (!deleteCorrespondingTasks.Success) return operationResult.AppendErrors(deleteCorrespondingTasks);
+
+            return operationResult;
+        }, cancellationToken);
+        
+        if (!deleteCategory.Success) return BadRequest(deleteCategory.Errors);
+
+        return Ok(deleteCategory);
     }
 }

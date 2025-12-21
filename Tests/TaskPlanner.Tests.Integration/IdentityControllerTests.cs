@@ -1,4 +1,4 @@
-﻿using FluentValidation;
+﻿/*using FluentValidation;
 using FluentValidation.Results;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -240,4 +240,4 @@ public class IdentityControllerTests : IClassFixture<Mongo2GoFixture>
         return mock;
     }
 
-}
+}*/

@@ -296,24 +296,33 @@ public class CategoryController : ControllerBase
     {
         var deleteCategory = await this._transactionManagementUtility.ExecuteInTransactionAsync(async () =>
         {
-            var operationResult = new OperationResult();
-
-            var deleteResult = await _categoryService.DeleteCategory(id, userId, cancellationToken);
-
-            if (!deleteResult.Success) return operationResult.AppendErrors(deleteResult);
-
-            var deleted = deleteResult.ResultObject;
-            if (deleted is null) return operationResult.AppendError("Something went wrong");
+            var operationResult = new OperationResult<Category>();
 
             var deleteCorrespondingTasks = await this._taskService.DeleteByCategoryId(id, userId, cancellationToken);
 
             if (!deleteCorrespondingTasks.Success) return operationResult.AppendErrors(deleteCorrespondingTasks);
+            
+            var deleteResult = await _categoryService.DeleteCategory(id, userId, cancellationToken);
+            if (!deleteResult.Success) return operationResult.AppendErrors(deleteResult);
 
-            return operationResult;
+            if (deleteResult.ResultObject is null) return operationResult.AppendError("Deletion encountered errors");
+
+            var deleted = deleteResult.ResultObject;
+            if (deleted is null) return operationResult.AppendError("Something went wrong");
+
+
+            return operationResult.WithRelatedObject(deleteResult.ResultObject);
         }, cancellationToken);
         
-        if (!deleteCategory.Success) return BadRequest(deleteCategory.Errors);
+        if (!deleteCategory.Success)
+        {
+            if (deleteCategory.Errors.Any(e => e is NotFoundError))
+                return NotFound(deleteCategory.Errors);
+            
+            return BadRequest(deleteCategory.Errors);
+        }
 
-        return Ok(deleteCategory);
+        var result = _mapper.Map<CategoryResponseModel>(deleteCategory.ResultObject);
+        return Ok(result);
     }
 }

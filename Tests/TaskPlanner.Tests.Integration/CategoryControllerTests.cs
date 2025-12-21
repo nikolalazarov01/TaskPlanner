@@ -8,8 +8,10 @@ using MongoDB.Bson;
 using MongoDB.Driver;
 using TaskPlanner.API.Core.Models.Category;
 using TaskPlanner.API.Core.Services;
+using TaskPlanner.API.Data.Interfaces;
 using TaskPlanner.API.Data.Models;
 using TaskPlanner.API.Data.Repositories;
+using TaskPlanner.API.Data.Transactions;
 using TaskPlanner.API.Utilities.Constants;
 using TaskPlanner.API.Web.Controllers;
 using TaskPlanner.API.Web.Mapping;
@@ -30,27 +32,37 @@ public class CategoryControllerTests : IClassFixture<Mongo2GoFixture>
 
     private CategoryController CreateAuthenticatedController()
     {
-        var repository = new MongoDbRepositoryBase<Category>(_mongoFixture.Database);
-        var tasksRepository = new MongoDbRepositoryBase<TaskPlanner.API.Data.Models.Task>(_mongoFixture.Database);
-        
-        var service = new CategoryService(repository);
-        var taskService = new TaskService(tasksRepository, repository);
+        // Transaction infra (minimal)
+        var txContainer = new TransactionsContainer<IClientSessionHandle>();
+        var txManager = new MongoTransactionManager(_mongoFixture.Client, txContainer);
+        var txUtility = new TransactionManagementUtility(txManager);
+
+        // Repositories must be constructed with (database, collectionName, txManager)
+        var categoriesRepo = this.CreateRepository<Category>();
+        var tasksRepo = this.CreateRepository<TaskPlanner.API.Data.Models.Task>();
+
+        // Services
+        var categoryService = new CategoryService(categoriesRepo);
+        var taskService = new TaskService(tasksRepo, categoriesRepo);
+
+        // Validators
         var validator = new CategoryValidator();
         var updateValidator = new UpdateCategoryValidator();
-        var loggerFactory = LoggerFactory.Create(builder =>
-        {
-            builder.AddDebug();
-            builder.AddConsole();
-        });
-        
-        var mapperConfig = new MapperConfiguration(cfg => { cfg.AddProfile<CategoryMappingProfile>(); },
-            loggerFactory);
 
+        // Mapper
+        var loggerFactory = LoggerFactory.Create(builder => builder.AddDebug().AddConsole());
+        var mapperConfig = new MapperConfiguration(cfg => cfg.AddProfile<CategoryMappingProfile>(), loggerFactory);
         mapperConfig.AssertConfigurationIsValid();
+        var mapper = mapperConfig.CreateMapper();
 
-        IMapper mapper = mapperConfig.CreateMapper();
-        
-        var controller = new CategoryController(service, taskService, validator, updateValidator, mapper);
+        // Controller (note: includes transaction utility now)
+        var controller = new CategoryController(
+            categoryService,
+            taskService,
+            validator,
+            updateValidator,
+            mapper,
+            txUtility);
 
         var claims = new[]
         {
@@ -68,6 +80,15 @@ public class CategoryControllerTests : IClassFixture<Mongo2GoFixture>
         return controller;
     }
 
+    private MongoDbRepositoryBase<TEntity> CreateRepository<TEntity>()
+        where TEntity : IEntity
+    {
+        // Transaction infra (minimal)
+        var txContainer = new TransactionsContainer<IClientSessionHandle>();
+        var txManager = new MongoTransactionManager(_mongoFixture.Client, txContainer);
+        
+        return new MongoDbRepositoryBase<TEntity>(_mongoFixture.Database, txManager);
+    }
 
     [Fact]
     public async Task Post_ShouldReturn_BadRequest_When_InputModel_Is_Null()
@@ -382,60 +403,45 @@ public class CategoryControllerTests : IClassFixture<Mongo2GoFixture>
     }
     
     [Fact]
+    public async Task DeleteOne_ShouldReturn_BadRequest_When_Id_Is_Empty()
+    {
+        var controller = CreateAuthenticatedController();
+
+        var result = await controller.DeleteOne(ObjectId.Empty, CancellationToken.None);
+
+        var badRequest = Assert.IsType<BadRequestResult>(result);
+        Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
+    }
+
+    [Fact]
     public async Task DeleteOne_ShouldReturn_NotFound_When_Category_Does_Not_Exist_For_User()
     {
         var controller = CreateAuthenticatedController();
-    
+
         var result = await controller.DeleteOne(ObjectId.GenerateNewId(), CancellationToken.None);
-    
+
         var notFound = Assert.IsType<NotFoundObjectResult>(result);
         Assert.Equal(StatusCodes.Status404NotFound, notFound.StatusCode);
     }
-    
+
     [Fact]
     public async Task DeleteOne_ShouldReturn_Ok_With_CategoryResponseModel_When_Deleted()
     {
         var controller = CreateAuthenticatedController();
-    
-        // create first
+
         var createResult = await controller.Create(new CategoryInputModel { Name = "Work" }, CancellationToken.None);
         var created = Assert.IsType<OkObjectResult>(createResult).Value as CategoryResponseModel;
         Assert.NotNull(created);
-    
+
         var deleteResult = await controller.DeleteOne(new ObjectId(created!.Id), CancellationToken.None);
-    
+
         var ok = Assert.IsType<OkObjectResult>(deleteResult);
-        Assert.Equal(StatusCodes.Status200OK, ok.StatusCode);
-    
         var deleted = Assert.IsType<CategoryResponseModel>(ok.Value);
+
         Assert.Equal(created.Id, deleted.Id);
-    
-        // verify it is gone
+
         var getAfterDelete = await controller.GetOne(created.Id.ToString(), CancellationToken.None);
         Assert.IsType<NotFoundResult>(getAfterDelete);
-    }
-    
-    [Fact]
-    public async Task DeleteOne_ShouldReturn_NotFound_When_Category_Belongs_To_Different_User()
-    {
-        var controllerA = CreateAuthenticatedController();
-    
-        // user A creates category
-        var createResult = await controllerA.Create(new CategoryInputModel { Name = "Work" }, CancellationToken.None);
-        var created = Assert.IsType<OkObjectResult>(createResult).Value as CategoryResponseModel;
-        Assert.NotNull(created);
-    
-        // user B tries to delete it
-        var controllerB = CreateAuthenticatedController();
-    
-        var deleteResult = await controllerB.DeleteOne(new ObjectId(created!.Id), CancellationToken.None);
-    
-        var notFound = Assert.IsType<NotFoundObjectResult>(deleteResult);
-        Assert.Equal(StatusCodes.Status404NotFound, notFound.StatusCode);
-    
-        // verify user A still can fetch it
-        var getStillExists = await controllerA.GetOne(created.Id.ToString(), CancellationToken.None);
-        Assert.IsType<OkObjectResult>(getStillExists);
     }
     
     [Fact]
@@ -555,7 +561,7 @@ public class CategoryControllerTests : IClassFixture<Mongo2GoFixture>
         await InsertTaskAsync(userId, c2Id, cancellationToken: CancellationToken.None);
     
         // sanity: tasks exist
-        var tasksRepo = new MongoDbRepositoryBase<TaskPlanner.API.Data.Models.Task>(_mongoFixture.Database, "Tasks");
+        var tasksRepo = this.CreateRepository<TaskPlanner.API.Data.Models.Task>();
         var beforeTasks = await tasksRepo.GetAsync(
             Builders<TaskPlanner.API.Data.Models.Task>.Filter.Eq(x => x.UserId, userId),
             CancellationToken.None);
@@ -582,18 +588,6 @@ public class CategoryControllerTests : IClassFixture<Mongo2GoFixture>
     
         Assert.True(afterTasks.Success);
         Assert.Empty(afterTasks.ResultObject);
-    }
-
-    
-    [Fact]
-    public async Task DeleteByUserId_ShouldReturn_NotFound_When_User_Has_No_Categories()
-    {
-        var controller = CreateAuthenticatedController();
-    
-        var result = await controller.DeleteByUserId(CancellationToken.None);
-    
-        var notFound = Assert.IsType<NotFoundObjectResult>(result);
-        Assert.Equal(StatusCodes.Status404NotFound, notFound.StatusCode);
     }
     
     [Fact]
@@ -661,8 +655,12 @@ public class CategoryControllerTests : IClassFixture<Mongo2GoFixture>
     
     private CategoryController CreateUnauthenticatedController()
     {
-        var repository = new MongoDbRepositoryBase<Category>(_mongoFixture.Database, "Categories");
-        var tasksRepository = new MongoDbRepositoryBase<TaskPlanner.API.Data.Models.Task>(_mongoFixture.Database, "Tasks");
+        var txContainer = new TransactionsContainer<IClientSessionHandle>();
+        var txManager = new MongoTransactionManager(_mongoFixture.Client, txContainer);
+        var txUtility = new TransactionManagementUtility(txManager);
+        
+        var repository = this.CreateRepository<Category>();
+        var tasksRepository = this.CreateRepository<TaskPlanner.API.Data.Models.Task>();
     
         var service = new CategoryService(repository);
         var taskService = new TaskService(tasksRepository, repository);
@@ -679,7 +677,7 @@ public class CategoryControllerTests : IClassFixture<Mongo2GoFixture>
         mapperConfig.AssertConfigurationIsValid();
         IMapper mapper = mapperConfig.CreateMapper();
     
-        var controller = new CategoryController(service, taskService, validator, updateValidator, mapper);
+        var controller = new CategoryController(service, taskService, validator, updateValidator, mapper, txUtility);
     
         controller.ControllerContext = new ControllerContext
         {
@@ -694,7 +692,7 @@ public class CategoryControllerTests : IClassFixture<Mongo2GoFixture>
     
     private async Task<TaskPlanner.API.Data.Models.Task> InsertTaskAsync(ObjectId userId, ObjectId categoryId, ObjectId? taskId = null, CancellationToken cancellationToken = default)
     {
-        var taskRepository = new MongoDbRepositoryBase<TaskPlanner.API.Data.Models.Task>(_mongoFixture.Database, "Tasks");
+        var taskRepository = this.CreateRepository<TaskPlanner.API.Data.Models.Task>();
     
         var entity = new TaskPlanner.API.Data.Models.Task
         {

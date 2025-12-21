@@ -12,5 +12,5 @@ public interface ITransactionManagementUtility
     /// <returns>
     /// The <see cref="Task"/> representing the asynchronous state of the operation. It wraps inside an <see cref="OperationResult"/> of the operation's execution.
     /// </returns>
-    Task<OperationResult> ExecuteInTransactionAsync(Func<Task<OperationResult>> operation, CancellationToken cancellationToken);
+    Task<OperationResult<TResult>> ExecuteInTransactionAsync<TResult>(Func<Task<OperationResult<TResult>>> operation, CancellationToken cancellationToken);
 }

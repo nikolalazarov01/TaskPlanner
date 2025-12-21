@@ -23,7 +23,7 @@ public class Mongo2GoFixture : IAsyncLifetime
         }
         else
         {
-            _runner = MongoDbRunner.Start(singleNodeReplSet: false);
+            _runner = MongoDbRunner.Start(singleNodeReplSet: true);
             connectionString = _runner.ConnectionString;
         }
 

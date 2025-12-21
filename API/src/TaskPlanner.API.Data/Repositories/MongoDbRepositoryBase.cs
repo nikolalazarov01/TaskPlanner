@@ -10,9 +10,12 @@ namespace TaskPlanner.API.Data.Repositories;
 public class MongoDbRepositoryBase<TEntity> : IBaseRepository<TEntity>
     where TEntity : IEntity
 {
-    public MongoDbRepositoryBase(IMongoDatabase database, string? collectionName = null)
+    private readonly ITransactionManager _transactionsManager;
+    
+    public MongoDbRepositoryBase(IMongoDatabase database, ITransactionManager transactionsManager, string? collectionName = null)
     {
         Database = database ?? throw new ArgumentNullException(nameof(database));
+        _transactionsManager = transactionsManager;
 
         collectionName ??= this.ResolveCollectionName();
 
@@ -22,6 +25,8 @@ public class MongoDbRepositoryBase<TEntity> : IBaseRepository<TEntity>
     protected IMongoDatabase Database { get; }
 
     private IMongoCollection<TEntity> Collection { get; }
+    
+    private IClientSessionHandle? Session => _transactionsManager.CurrentSession();
     
     /// <inheritdoc/>
     public async Task<OperationResult<TEntity>> CreateAsync(TEntity entity)
@@ -273,7 +278,9 @@ public class MongoDbRepositoryBase<TEntity> : IBaseRepository<TEntity>
             filter ??= Builders<TEntity>.Filter.Empty;
 
             // Return deleted entity (useful for controller/service mapping)
-            var deleted = await Collection.FindOneAndDeleteAsync(filter, cancellationToken: cancellationToken);
+            var deleted = Session is null
+                ? await Collection.FindOneAndDeleteAsync(filter, cancellationToken: cancellationToken)
+                : await Collection.FindOneAndDeleteAsync(Session, filter, cancellationToken: cancellationToken);
 
             if (deleted is null)
             {
@@ -299,14 +306,13 @@ public class MongoDbRepositoryBase<TEntity> : IBaseRepository<TEntity>
         {
             filter ??= Builders<TEntity>.Filter.Empty;
 
-            var deleteResult = await Collection.DeleteManyAsync(filter, cancellationToken);
+            var deleteResult = Session is null
+                ? await Collection.DeleteManyAsync(filter, cancellationToken)
+                : await Collection.DeleteManyAsync(Session, filter, cancellationToken: cancellationToken);
 
             // If you want "not found" semantics when nothing was deleted:
-            if (deleteResult.DeletedCount == 0)
-            {
-                result.AppendError(new NotFoundError("No entities found to delete."));
-                return result;
-            }
+            if (deleteResult.DeletedCount == 0) return result;
+            
 
             return result.WithRelatedObject(deleteResult.DeletedCount);
         }

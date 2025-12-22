@@ -1,4 +1,4 @@
-/*using System.Security.Claims;
+using System.Security.Claims;
 using AutoMapper;
 using FluentValidation.Results;
 using Microsoft.AspNetCore.Http;
@@ -30,8 +30,8 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
 
     private TaskController CreateAuthenticatedController(out ObjectId userId)
     {
-        var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
-        var categoryRepository = new MongoDbRepositoryBase<Category>(_mongoFixture.Database, "Categories");
+        var taskRepository = TestPreparationData.CreateRepository<TaskPlanner.API.Data.Models.Task>(this._mongoFixture);
+        var categoryRepository = TestPreparationData.CreateRepository<Category>(this._mongoFixture);
 
         var service = new TaskService(taskRepository, categoryRepository);
 
@@ -67,8 +67,8 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
 
     private TaskController CreateUnauthenticatedController()
     {
-        var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
-        var categoryRepository = new MongoDbRepositoryBase<Category>(_mongoFixture.Database, "Categories");
+        var taskRepository = TestPreparationData.CreateRepository<TaskPlanner.API.Data.Models.Task>(this._mongoFixture);
+        var categoryRepository = TestPreparationData.CreateRepository<Category>(this._mongoFixture);
 
         var service = new TaskService(taskRepository, categoryRepository);
 
@@ -102,7 +102,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
     private async Task<Category> InsertCategoryAsync(ObjectId userId, ObjectId categoryId,
         CancellationToken cancellationToken)
     {
-        var categoryRepository = new MongoDbRepositoryBase<Category>(_mongoFixture.Database, "Categories");
+        var categoryRepository = TestPreparationData.CreateRepository<Category>(this._mongoFixture);
 
         var category = new Category
         {
@@ -121,7 +121,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
     private async Task<TaskEntity> InsertTaskAsync(ObjectId userId, ObjectId categoryId, ObjectId taskId,
         CancellationToken cancellationToken)
     {
-        var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database);
+        var taskRepository = TestPreparationData.CreateRepository<TaskEntity>(this._mongoFixture);
 
         var entity = new TaskEntity
         {
@@ -281,7 +281,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         var badRequest = Assert.IsType<BadRequestObjectResult>(result);
         Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
 
-        var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
+        var taskRepository = TestPreparationData.CreateRepository<TaskEntity>(this._mongoFixture);
         var filter = Builders<TaskEntity>.Filter.Eq(x => x.UserId, userId);
         var get = await taskRepository.GetAsync(filter, CancellationToken.None);
         Assert.True(get.Success);
@@ -318,7 +318,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         var diffResp = (response.Deadline.Value - deadline).Duration();
         Assert.True(diffResp < TimeSpan.FromMilliseconds(1), $"Deadline differs by {diffResp.TotalMilliseconds} ms");
 
-        var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
+        var taskRepository = TestPreparationData.CreateRepository<TaskEntity>(this._mongoFixture);
         var filter = Builders<TaskEntity>.Filter.And(Builders<TaskEntity>.Filter.Eq(x => x.UserId, userId),
             Builders<TaskEntity>.Filter.Eq(x => x.CategoryId, categoryId));
 
@@ -359,7 +359,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         var badRequest = Assert.IsType<BadRequestObjectResult>(result);
         Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
 
-        var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
+        var taskRepository = TestPreparationData.CreateRepository<TaskEntity>(this._mongoFixture);
 
         var filterB = Builders<TaskEntity>.Filter.Eq(x => x.UserId, userB);
         var getB = await taskRepository.GetAsync(filterB, CancellationToken.None);
@@ -595,7 +595,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         var diffResp = (response.Deadline.Value - newDeadline).Duration();
         Assert.True(diffResp < TimeSpan.FromMilliseconds(1), $"Deadline differs by {diffResp.TotalMilliseconds} ms");
 
-        var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
+        var taskRepository = TestPreparationData.CreateRepository<TaskEntity>(this._mongoFixture);
         var get = await taskRepository.GetOneAsync(Builders<TaskEntity>.Filter.Eq(x => x.Id, taskId),
             CancellationToken.None);
         Assert.True(get.Success);
@@ -646,7 +646,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         var notFound = Assert.IsType<NotFoundObjectResult>(result);
         Assert.Equal(StatusCodes.Status404NotFound, notFound.StatusCode);
 
-        var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
+        var taskRepository = TestPreparationData.CreateRepository<TaskEntity>(this._mongoFixture);
         var get = await taskRepository.GetOneAsync(Builders<TaskEntity>.Filter.Eq(x => x.Id, taskId),
             CancellationToken.None);
         Assert.True(get.Success);
@@ -710,7 +710,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         Assert.Equal(StatusCodes.Status404NotFound, notFound.StatusCode);
 
         // Ensure existing task was NOT updated (method should short-circuit before updating)
-        var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
+        var taskRepository = TestPreparationData.CreateRepository<TaskEntity>(this._mongoFixture);
         var get = await taskRepository.GetOneAsync(Builders<TaskEntity>.Filter.Eq(x => x.Id, existingTaskId),
             CancellationToken.None);
         Assert.True(get.Success);
@@ -747,7 +747,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         var notFound = Assert.IsType<NotFoundObjectResult>(result);
         Assert.Equal(StatusCodes.Status404NotFound, notFound.StatusCode);
 
-        var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
+        var taskRepository = TestPreparationData.CreateRepository<TaskEntity>(this._mongoFixture);
 
         var getA = await taskRepository.GetOneAsync(Builders<TaskEntity>.Filter.Eq(x => x.Id, taskAId),
             CancellationToken.None);
@@ -790,7 +790,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         var modifiedCount = Assert.IsType<long>(ok.Value);
         Assert.Equal(2, modifiedCount);
 
-        var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
+        var taskRepository = TestPreparationData.CreateRepository<TaskEntity>(this._mongoFixture);
 
         var get1 = await taskRepository.GetOneAsync(Builders<TaskEntity>.Filter.Eq(x => x.Id, taskId1),
             CancellationToken.None);
@@ -826,7 +826,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         var notFound = Assert.IsType<BadRequestResult>(result);
         Assert.Equal(StatusCodes.Status400BadRequest, notFound.StatusCode);
 
-        var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
+        var taskRepository = TestPreparationData.CreateRepository<TaskEntity>(this._mongoFixture);
         var get = await taskRepository.GetOneAsync(Builders<TaskEntity>.Filter.Eq(x => x.Id, existingTaskId),
             CancellationToken.None);
         Assert.True(get.Success);
@@ -891,7 +891,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         Assert.Equal(StatusCodes.Status404NotFound, notFound.StatusCode);
 
         // Ensure task remains unchanged
-        var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
+        var taskRepository = TestPreparationData.CreateRepository<TaskEntity>(this._mongoFixture);
         var get = await taskRepository.GetOneAsync(Builders<TaskEntity>.Filter.Eq(x => x.Id, taskId),
             CancellationToken.None);
 
@@ -921,7 +921,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         var modifiedCount = Assert.IsType<long>(ok.Value);
         Assert.Equal(1, modifiedCount);
 
-        var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
+        var taskRepository = TestPreparationData.CreateRepository<TaskEntity>(this._mongoFixture);
         var get = await taskRepository.GetOneAsync(Builders<TaskEntity>.Filter.Eq(x => x.Id, taskId),
             CancellationToken.None);
 
@@ -1234,7 +1234,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         Assert.Equal(StatusCodes.Status404NotFound, notFound.StatusCode);
 
         // Ensure task still exists
-        var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
+        var taskRepository = TestPreparationData.CreateRepository<TaskEntity>(this._mongoFixture);
         var get = await taskRepository.GetOneAsync(Builders<TaskEntity>.Filter.Eq(x => x.Id, taskId),
             CancellationToken.None);
         Assert.True(get.Success);
@@ -1263,7 +1263,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         Assert.Equal(userId.ToString(), response.UserId);
 
         // Ensure task is removed from DB
-        var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
+        var taskRepository = TestPreparationData.CreateRepository<TaskEntity>(this._mongoFixture);
         var get = await taskRepository.GetOneAsync(Builders<TaskEntity>.Filter.Eq(x => x.Id, taskId),
             CancellationToken.None);
 
@@ -1340,7 +1340,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         Assert.Equal(StatusCodes.Status404NotFound, notFound.StatusCode);
 
         // Ensure existing task still exists
-        var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
+        var taskRepository = TestPreparationData.CreateRepository<TaskEntity>(this._mongoFixture);
         var get = await taskRepository.GetOneAsync(Builders<TaskEntity>.Filter.Eq(x => x.Id, existingTaskId),
             CancellationToken.None);
         Assert.True(get.Success);
@@ -1371,7 +1371,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         var notFound = Assert.IsType<NotFoundObjectResult>(result);
         Assert.Equal(StatusCodes.Status404NotFound, notFound.StatusCode);
 
-        var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
+        var taskRepository = TestPreparationData.CreateRepository<TaskEntity>(this._mongoFixture);
 
         var getA = await taskRepository.GetOneAsync(Builders<TaskEntity>.Filter.Eq(x => x.Id, taskAId),
             CancellationToken.None);
@@ -1405,7 +1405,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         var deletedCount = Assert.IsType<long>(ok.Value);
         Assert.Equal(2, deletedCount);
 
-        var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
+        var taskRepository = TestPreparationData.CreateRepository<TaskEntity>(this._mongoFixture);
         var get1 = await taskRepository.GetOneAsync(Builders<TaskEntity>.Filter.Eq(x => x.Id, taskId1),
             CancellationToken.None);
         var get2 = await taskRepository.GetOneAsync(Builders<TaskEntity>.Filter.Eq(x => x.Id, taskId2),
@@ -1467,7 +1467,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         var notFound = Assert.IsType<NotFoundObjectResult>(result);
         Assert.Equal(StatusCodes.Status404NotFound, notFound.StatusCode);
 
-        var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
+        var taskRepository = TestPreparationData.CreateRepository<TaskEntity>(this._mongoFixture);
         var get = await taskRepository.GetOneAsync(Builders<TaskEntity>.Filter.Eq(x => x.Id, taskId),
             CancellationToken.None);
         Assert.True(get.Success);
@@ -1500,7 +1500,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         var deletedCount = Assert.IsType<long>(ok.Value);
         Assert.Equal(2, deletedCount);
 
-        var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
+        var taskRepository = TestPreparationData.CreateRepository<TaskEntity>(this._mongoFixture);
 
         var getA1 = await taskRepository.GetOneAsync(Builders<TaskEntity>.Filter.Eq(x => x.Id, a1),
             CancellationToken.None);
@@ -1528,18 +1528,18 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
     }
     
     [Fact]
-    public async Task DeleteManyByUserId_ShouldReturn_NotFound_When_User_Has_No_Tasks()
+    public async Task DeleteManyByUserId_ShouldReturn_Ok_When_User_Has_No_Tasks()
     {
         var controller = CreateAuthenticatedController(out var userId);
     
         // ensure user exists but has no tasks
         var result = await controller.DeleteMany(CancellationToken.None);
     
-        var notFound = Assert.IsType<NotFoundObjectResult>(result);
-        Assert.Equal(StatusCodes.Status404NotFound, notFound.StatusCode);
+        var notFound = Assert.IsType<OkObjectResult>(result);
+        Assert.Equal(StatusCodes.Status200OK, notFound.StatusCode);
     
         // sanity: still no tasks
-        var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
+        var taskRepository = TestPreparationData.CreateRepository<TaskEntity>(this._mongoFixture);
         var get = await taskRepository.GetAsync(Builders<TaskEntity>.Filter.Eq(x => x.UserId, userId), CancellationToken.None);
         Assert.True(get.Success);
         Assert.Empty(get.ResultObject);
@@ -1573,7 +1573,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         Assert.Equal(3, deletedCount);
     
         // Verify DB: no tasks remain for userId
-        var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
+        var taskRepository = TestPreparationData.CreateRepository<TaskEntity>(this._mongoFixture);
         var get = await taskRepository.GetAsync(Builders<TaskEntity>.Filter.Eq(x => x.UserId, userId), CancellationToken.None);
         Assert.True(get.Success);
         Assert.Empty(get.ResultObject);
@@ -1607,7 +1607,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         var deletedCount = Assert.IsType<long>(ok.Value);
         Assert.Equal(2, deletedCount);
     
-        var taskRepository = new MongoDbRepositoryBase<TaskEntity>(_mongoFixture.Database, "Tasks");
+        var taskRepository = TestPreparationData.CreateRepository<TaskEntity>(this._mongoFixture);
     
         // userA tasks removed
         var getA = await taskRepository.GetAsync(Builders<TaskEntity>.Filter.Eq(x => x.UserId, userA), CancellationToken.None);
@@ -1627,4 +1627,4 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         Assert.True(diff < TimeSpan.FromMilliseconds(maxMs),
             $"Expected {expected:o} but got {actual:o}. Diff={diff.TotalMilliseconds}ms");
     }
-}*/
+}

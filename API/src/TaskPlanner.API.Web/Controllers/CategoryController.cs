@@ -229,27 +229,7 @@ public class CategoryController : ControllerBase
     
         if (!this.TryGetUserObjectId(out var userId)) return Unauthorized();
     
-        var deleteCorrespondingTasks = await _taskService.DeleteByCategoryId(categoryIds, userId, cancellationToken);
-    
-        if (!deleteCorrespondingTasks.Success)
-        {
-            // keep same pattern you used above:
-            // only surface errors if it is NOT a NotFoundError (i.e. if something actually failed)
-            if (!deleteCorrespondingTasks.Errors.Any(e => e is NotFoundError))
-                return BadRequest(deleteCorrespondingTasks.Errors);
-        }
-        
-        var deleteResult = await _categoryService.DeleteCategories(categoryIds, userId, cancellationToken);
-    
-        if (!deleteResult.Success)
-        {
-            if (deleteResult.Errors.Any(e => e is NotFoundError))
-                return NotFound(deleteResult.Errors);
-    
-            return BadRequest(deleteResult.Errors);
-        }
-        
-        return Ok(deleteResult.ResultObject);
+        return await this.DeleteManyCategoriesInternally(categoryIds, userId, cancellationToken);
     }
     
     /// <summary>
@@ -269,27 +249,7 @@ public class CategoryController : ControllerBase
     {
         if (!this.TryGetUserObjectId(out var userId)) return Unauthorized();
 
-        var deleteResult = await _categoryService.DeleteCategories(userId, cancellationToken);
-
-        if (!deleteResult.Success)
-        {
-            if (deleteResult.Errors.Any(e => e is NotFoundError))
-                return NotFound(deleteResult.Errors);
-
-            return BadRequest(deleteResult.Errors);
-        }
-        
-        var deleteCorrespondingTasks = await this._taskService.DeleteMany(userId, cancellationToken);
-
-        if (!deleteCorrespondingTasks.Success)
-        {
-            if (!deleteCorrespondingTasks.Errors.Any(e => e is NotFoundError))
-                return BadRequest(deleteResult.Errors);
-        }
-
-
-        // returns deleted count
-        return Ok(new { deletedCount = deleteResult.ResultObject });
+        return await this.DeleteCategoriesByUserIdInternally(userId, cancellationToken);
     }
 
     private async Task<IActionResult> DeleteCategoryInternally(ObjectId id, ObjectId userId, CancellationToken cancellationToken)
@@ -324,5 +284,62 @@ public class CategoryController : ControllerBase
 
         var result = _mapper.Map<CategoryResponseModel>(deleteCategory.ResultObject);
         return Ok(result);
+    }
+
+    private async Task<IActionResult> DeleteManyCategoriesInternally(ObjectId[] categoryIds, ObjectId userId, CancellationToken cancellationToken)
+    {
+        var deleteCategories = await this._transactionManagementUtility.ExecuteInTransactionAsync(async () =>
+        {
+            var operationResult = new OperationResult<long>();
+
+            var deleteCorrespondingTasks =
+                await _taskService.DeleteByCategoryId(categoryIds, userId, cancellationToken);
+
+            if (!deleteCorrespondingTasks.Success) return operationResult.AppendErrors(deleteCorrespondingTasks);
+
+            var deleteResult = await _categoryService.DeleteCategories(categoryIds, userId, cancellationToken);
+
+            if (!deleteResult.Success) return operationResult.AppendErrors(deleteResult);
+
+            return operationResult.WithRelatedObject(deleteResult.ResultObject);
+        }, cancellationToken);
+        
+        if (!deleteCategories.Success)
+        {
+            if (deleteCategories.Errors.Any(e => e is NotFoundError))
+                return NotFound(deleteCategories.Errors);
+            
+            return BadRequest(deleteCategories.Errors);
+        }
+
+        return Ok(deleteCategories.ResultObject);
+    }
+
+    private async Task<IActionResult> DeleteCategoriesByUserIdInternally(ObjectId userId, CancellationToken cancellationToken)
+    {
+        var deleteCategories = await this._transactionManagementUtility.ExecuteInTransactionAsync(async () =>
+        {
+            var operationResult = new OperationResult<long>();
+
+            var deleteResult = await _categoryService.DeleteCategories(userId, cancellationToken);
+
+            if (!deleteResult.Success) return operationResult.AppendErrors(deleteResult);
+
+            var deleteCorrespondingTasks = await this._taskService.DeleteMany(userId, cancellationToken);
+
+            if (!deleteCorrespondingTasks.Success) return operationResult.AppendErrors(deleteCorrespondingTasks);
+
+            return operationResult.WithRelatedObject(deleteResult.ResultObject);
+        }, cancellationToken);
+            
+        if (!deleteCategories.Success)
+        {
+            if (deleteCategories.Errors.Any(e => e is NotFoundError))
+                return NotFound(deleteCategories.Errors);
+            
+            return BadRequest(deleteCategories.Errors);
+        }
+            
+        return Ok(new { deletedCount = deleteCategories.ResultObject });
     }
 }

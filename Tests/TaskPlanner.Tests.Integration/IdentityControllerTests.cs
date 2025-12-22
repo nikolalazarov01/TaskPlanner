@@ -1,14 +1,12 @@
-﻿/*using FluentValidation;
+﻿using FluentValidation;
 using FluentValidation.Results;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Moq;
 using OneBitSoftware.Utilities;
 using TaskPlanner.API.Core.Interfaces;
-using TaskPlanner.API.Core.Models;
 using TaskPlanner.API.Core.Models.Identity;
 using TaskPlanner.API.Core.Services;
-using TaskPlanner.API.Data.Interfaces;
 using TaskPlanner.API.Data.Models;
 using TaskPlanner.API.Data.Repositories;
 using TaskPlanner.API.Web.Controllers;
@@ -28,7 +26,7 @@ public class IdentityControllerTests : IClassFixture<Mongo2GoFixture>
     
     private IdentityController CreateController()
     {
-        var repository = new MongoDbRepositoryBase<User>(_mongoFixture.Database);
+        var repository = TestPreparationData.CreateRepository<User>(this._mongoFixture);
 
         var jwtOptions = Options.Create(new JwtOptions
         {
@@ -240,4 +238,4 @@ public class IdentityControllerTests : IClassFixture<Mongo2GoFixture>
         return mock;
     }
 
-}*/
+}

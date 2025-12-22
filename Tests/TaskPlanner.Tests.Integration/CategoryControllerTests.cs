@@ -33,11 +33,7 @@ public class CategoryControllerTests : IClassFixture<Mongo2GoFixture>
     private CategoryController CreateAuthenticatedController()
     {
         // Transaction infra (minimal)
-        var (_, txUtility) = TestPreparationData.CreateTransactionManagementComponents(this._mongoFixture);
-
-        // Repositories must be constructed with (database, collectionName, txManager)
-        var categoriesRepo = TestPreparationData.CreateRepository<Category>(this._mongoFixture);
-        var tasksRepo = TestPreparationData.CreateRepository<TaskPlanner.API.Data.Models.Task>(this._mongoFixture);
+        var (_, txUtility, categoriesRepo, tasksRepo) = TestPreparationData.CreateInfra(this._mongoFixture);
 
         // Services
         var categoryService = new CategoryService(categoriesRepo);
@@ -80,10 +76,7 @@ public class CategoryControllerTests : IClassFixture<Mongo2GoFixture>
 
     private CategoryController CreateUnauthenticatedController()
     {
-        var (_, txUtility) = TestPreparationData.CreateTransactionManagementComponents(this._mongoFixture);
-        
-        var repository = TestPreparationData.CreateRepository<Category>(this._mongoFixture);
-        var tasksRepository = TestPreparationData.CreateRepository<TaskPlanner.API.Data.Models.Task>(this._mongoFixture);
+        var (_, txUtility, repository, tasksRepository) = TestPreparationData.CreateInfra(this._mongoFixture);
     
         var service = new CategoryService(repository);
         var taskService = new TaskService(tasksRepository, repository);
@@ -118,9 +111,7 @@ public class CategoryControllerTests : IClassFixture<Mongo2GoFixture>
     /// </summary>
     private CategoryController CreateControllerWithFailingTaskService()
     {
-        var (_, txUtility) = TestPreparationData.CreateTransactionManagementComponents(this._mongoFixture);
-    
-        var categoriesRepo = TestPreparationData.CreateRepository<Category>(this._mongoFixture);
+        var (_, txUtility, categoriesRepo, _) = TestPreparationData.CreateInfra(this._mongoFixture);
     
         var mockTaskService = new Mock<ITaskService>();
     
@@ -640,7 +631,7 @@ public class CategoryControllerTests : IClassFixture<Mongo2GoFixture>
         await InsertTaskAsync(userId, c2Id, cancellationToken: CancellationToken.None);
     
         // sanity: tasks exist
-        var tasksRepo = TestPreparationData.CreateRepository<TaskPlanner.API.Data.Models.Task>(this._mongoFixture);
+        var (_, _, _, tasksRepo) = TestPreparationData.CreateInfra(this._mongoFixture);
         var beforeTasks = await tasksRepo.GetAsync(
             Builders<TaskPlanner.API.Data.Models.Task>.Filter.Eq(x => x.UserId, userId),
             CancellationToken.None);
@@ -761,7 +752,7 @@ public class CategoryControllerTests : IClassFixture<Mongo2GoFixture>
         Assert.NotNull(okResult.Value);
 
         // Verify task still exists
-        var tasksRepo = TestPreparationData.CreateRepository<TaskPlanner.API.Data.Models.Task>(this._mongoFixture);
+        var (_, _, _, tasksRepo) = TestPreparationData.CreateInfra(this._mongoFixture);
         var tasks = await tasksRepo.GetAsync(
             Builders<TaskPlanner.API.Data.Models.Task>.Filter.Eq(x => x.CategoryId, new ObjectId(created.Id)),
             CancellationToken.None);
@@ -817,7 +808,7 @@ public class CategoryControllerTests : IClassFixture<Mongo2GoFixture>
         Assert.IsType<OkObjectResult>(get2);
 
         // Verify both tasks still exist
-        var tasksRepo = TestPreparationData.CreateRepository<TaskPlanner.API.Data.Models.Task>(this._mongoFixture);
+        var (_, _, _, tasksRepo) = TestPreparationData.CreateInfra(this._mongoFixture);
         var tasks = await tasksRepo.GetAsync(
             Builders<TaskPlanner.API.Data.Models.Task>.Filter.In(x => x.CategoryId, new[] { c1Id, c2Id }),
             CancellationToken.None);
@@ -858,7 +849,7 @@ public class CategoryControllerTests : IClassFixture<Mongo2GoFixture>
         Assert.IsType<OkObjectResult>(getResult);
 
         // Verify task still exists
-        var tasksRepo = TestPreparationData.CreateRepository<TaskPlanner.API.Data.Models.Task>(this._mongoFixture);
+        var (_, _, _, tasksRepo) = TestPreparationData.CreateInfra(this._mongoFixture);
         var tasks = await tasksRepo.GetAsync(
             Builders<TaskPlanner.API.Data.Models.Task>.Filter.Eq(x => x.UserId, userId),
             CancellationToken.None);
@@ -897,7 +888,7 @@ public class CategoryControllerTests : IClassFixture<Mongo2GoFixture>
         Assert.IsType<NotFoundResult>(getResult);
 
         // Verify tasks are deleted
-        var tasksRepo = TestPreparationData.CreateRepository<TaskPlanner.API.Data.Models.Task>(this._mongoFixture);
+        var (_, _, _, tasksRepo) = TestPreparationData.CreateInfra(this._mongoFixture);
         var tasks = await tasksRepo.GetAsync(
             Builders<TaskPlanner.API.Data.Models.Task>.Filter.Eq(x => x.CategoryId, categoryId),
             CancellationToken.None);
@@ -937,7 +928,7 @@ public class CategoryControllerTests : IClassFixture<Mongo2GoFixture>
         Assert.IsType<NotFoundResult>(await controller.GetOne(c2Id.ToString(), CancellationToken.None));
 
         // Verify tasks are deleted
-        var tasksRepo = TestPreparationData.CreateRepository<TaskPlanner.API.Data.Models.Task>(this._mongoFixture);
+        var (_, _, _, tasksRepo) = TestPreparationData.CreateInfra(this._mongoFixture);
         var tasks = await tasksRepo.GetAsync(
             Builders<TaskPlanner.API.Data.Models.Task>.Filter.In(x => x.CategoryId, new[] { c1Id, c2Id }),
             CancellationToken.None);
@@ -970,7 +961,7 @@ public class CategoryControllerTests : IClassFixture<Mongo2GoFixture>
     
     private async Task<TaskPlanner.API.Data.Models.Task> InsertTaskAsync(ObjectId userId, ObjectId categoryId, ObjectId? taskId = null, CancellationToken cancellationToken = default)
     {
-        var taskRepository = TestPreparationData.CreateRepository<TaskPlanner.API.Data.Models.Task>(this._mongoFixture);
+        var (_, _, _, taskRepository) = TestPreparationData.CreateInfra(this._mongoFixture);
     
         var entity = new TaskPlanner.API.Data.Models.Task
         {

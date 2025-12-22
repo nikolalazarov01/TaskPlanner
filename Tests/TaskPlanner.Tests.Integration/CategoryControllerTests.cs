@@ -6,6 +6,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using Moq;
+using OneBitSoftware.Utilities;
+using TaskPlanner.API.Core.Interfaces;
 using TaskPlanner.API.Core.Models.Category;
 using TaskPlanner.API.Core.Services;
 using TaskPlanner.API.Data.Models;
@@ -104,6 +107,62 @@ public class CategoryControllerTests : IClassFixture<Mongo2GoFixture>
             HttpContext = new DefaultHttpContext
             {
                 User = new ClaimsPrincipal(new ClaimsIdentity()) // no claims
+            }
+        };
+    
+        return controller;
+    }
+    
+    /// <summary>
+    /// Creates a controller with a failing task service to simulate transaction rollback
+    /// </summary>
+    private CategoryController CreateControllerWithFailingTaskService()
+    {
+        var (_, txUtility) = TestPreparationData.CreateTransactionManagementComponents(this._mongoFixture);
+    
+        var categoriesRepo = TestPreparationData.CreateRepository<Category>(this._mongoFixture);
+    
+        var mockTaskService = new Mock<ITaskService>();
+    
+        mockTaskService
+            .Setup(x => x.DeleteByCategoryId(It.IsAny<ObjectId>(), It.IsAny<ObjectId>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new OperationResult<long>().AppendError("Simulated task deletion failure"));
+    
+        mockTaskService
+            .Setup(x => x.DeleteByCategoryId(It.IsAny<ObjectId[]>(), It.IsAny<ObjectId>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new OperationResult<long>().AppendError("Simulated task deletion failure"));
+    
+        // ADD THIS (for DeleteByUserId rollback test)
+        mockTaskService
+            .Setup(x => x.DeleteMany(It.IsAny<ObjectId>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new OperationResult<long>().AppendError("Simulated task deletion failure"));
+    
+        var categoryService = new CategoryService(categoriesRepo);
+        var validator = new CategoryValidator();
+        var updateValidator = new UpdateCategoryValidator();
+    
+        var loggerFactory = LoggerFactory.Create(builder => builder.AddDebug().AddConsole());
+        var mapperConfig = new MapperConfiguration(cfg => cfg.AddProfile<CategoryMappingProfile>(), loggerFactory);
+        var mapper = mapperConfig.CreateMapper();
+    
+        var controller = new CategoryController(
+            categoryService,
+            mockTaskService.Object,
+            validator,
+            updateValidator,
+            mapper,
+            txUtility);
+    
+        var claims = new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, ObjectId.GenerateNewId().ToString())
+        };
+    
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth"))
             }
         };
     
@@ -667,10 +726,246 @@ public class CategoryControllerTests : IClassFixture<Mongo2GoFixture>
         Assert.Equal("B1", listB[0].Name);
     }
     
+    [Fact]
+    public async Task DeleteOne_ShouldRollback_When_TaskDeletion_Fails()
+    {
+        // Arrange: create a category with the normal controller
+        var normalController = CreateAuthenticatedController();
+        var userId = GetUserId(normalController);
+
+        var createResult = await normalController.Create(
+            new CategoryInputModel { Name = "ToDelete" }, 
+            CancellationToken.None);
+        
+        var created = Assert.IsType<OkObjectResult>(createResult).Value as CategoryResponseModel;
+        Assert.NotNull(created);
+
+        // Insert a task for this category
+        await InsertTaskAsync(userId, new ObjectId(created!.Id), cancellationToken: CancellationToken.None);
+
+        // Act: try to delete with failing task service
+        var failingController = CreateControllerWithFailingTaskService();
+        SetUserId(failingController, userId); // Use same user ID
+
+        var deleteResult = await failingController.DeleteOne(
+            new ObjectId(created.Id), 
+            CancellationToken.None);
+
+        // Assert: deletion should fail
+        var badRequest = Assert.IsType<BadRequestObjectResult>(deleteResult);
+        Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
+
+        // Verify category still exists (rollback worked)
+        var getResult = await normalController.GetOne(created.Id.ToString(), CancellationToken.None);
+        var okResult = Assert.IsType<OkObjectResult>(getResult);
+        Assert.NotNull(okResult.Value);
+
+        // Verify task still exists
+        var tasksRepo = TestPreparationData.CreateRepository<TaskPlanner.API.Data.Models.Task>(this._mongoFixture);
+        var tasks = await tasksRepo.GetAsync(
+            Builders<TaskPlanner.API.Data.Models.Task>.Filter.Eq(x => x.CategoryId, new ObjectId(created.Id)),
+            CancellationToken.None);
+        
+        Assert.True(tasks.Success);
+        Assert.Single(tasks.ResultObject);
+    }
+
+    [Fact]
+    public async Task DeleteMany_ShouldRollback_When_TaskDeletion_Fails()
+    {
+        // Arrange: create categories with the normal controller
+        var normalController = CreateAuthenticatedController();
+        var userId = GetUserId(normalController);
+
+        var c1Result = await normalController.Create(
+            new CategoryInputModel { Name = "C1" }, 
+            CancellationToken.None);
+        var c1 = Assert.IsType<OkObjectResult>(c1Result).Value as CategoryResponseModel;
+
+        var c2Result = await normalController.Create(
+            new CategoryInputModel { Name = "C2" }, 
+            CancellationToken.None);
+        var c2 = Assert.IsType<OkObjectResult>(c2Result).Value as CategoryResponseModel;
+
+        Assert.NotNull(c1);
+        Assert.NotNull(c2);
+
+        var c1Id = new ObjectId(c1!.Id);
+        var c2Id = new ObjectId(c2!.Id);
+
+        // Insert tasks
+        await InsertTaskAsync(userId, c1Id, cancellationToken: CancellationToken.None);
+        await InsertTaskAsync(userId, c2Id, cancellationToken: CancellationToken.None);
+
+        // Act: try to delete with failing task service
+        var failingController = CreateControllerWithFailingTaskService();
+        SetUserId(failingController, userId);
+
+        var deleteResult = await failingController.DeleteMany(
+            new[] { c1Id, c2Id }, 
+            CancellationToken.None);
+
+        // Assert: deletion should fail
+        var badRequest = Assert.IsType<BadRequestObjectResult>(deleteResult);
+        Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
+
+        // Verify both categories still exist (rollback worked)
+        var get1 = await normalController.GetOne(c1Id.ToString(), CancellationToken.None);
+        var get2 = await normalController.GetOne(c2Id.ToString(), CancellationToken.None);
+        
+        Assert.IsType<OkObjectResult>(get1);
+        Assert.IsType<OkObjectResult>(get2);
+
+        // Verify both tasks still exist
+        var tasksRepo = TestPreparationData.CreateRepository<TaskPlanner.API.Data.Models.Task>(this._mongoFixture);
+        var tasks = await tasksRepo.GetAsync(
+            Builders<TaskPlanner.API.Data.Models.Task>.Filter.In(x => x.CategoryId, new[] { c1Id, c2Id }),
+            CancellationToken.None);
+        
+        Assert.True(tasks.Success);
+        Assert.Equal(2, tasks.ResultObject.Count);
+    }
+    
+    [Fact]
+    public async Task DeleteByUserId_ShouldRollback_When_TaskDeletion_Fails()
+    {
+        // Arrange: create categories
+        var normalController = CreateAuthenticatedController();
+        var userId = GetUserId(normalController);
+
+        var c1Result = await normalController.Create(
+            new CategoryInputModel { Name = "C1" },
+            CancellationToken.None);
+        var c1 = Assert.IsType<OkObjectResult>(c1Result).Value as CategoryResponseModel;
+        Assert.NotNull(c1);
+
+        var c1Id = new ObjectId(c1!.Id);
+        await InsertTaskAsync(userId, c1Id, cancellationToken: CancellationToken.None);
+
+        // Use existing helper (now also fails DeleteMany)
+        var failingController = CreateControllerWithFailingTaskService();
+        SetUserId(failingController, userId);
+
+        // Act
+        var deleteResult = await failingController.DeleteByUserId(CancellationToken.None);
+
+        // Assert: deletion should fail
+        var badRequest = Assert.IsType<BadRequestObjectResult>(deleteResult);
+        Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
+
+        // Verify category still exists (rollback worked)
+        var getResult = await failingController.GetOne(c1Id.ToString(), CancellationToken.None);
+        Assert.IsType<OkObjectResult>(getResult);
+
+        // Verify task still exists
+        var tasksRepo = TestPreparationData.CreateRepository<TaskPlanner.API.Data.Models.Task>(this._mongoFixture);
+        var tasks = await tasksRepo.GetAsync(
+            Builders<TaskPlanner.API.Data.Models.Task>.Filter.Eq(x => x.UserId, userId),
+            CancellationToken.None);
+
+        Assert.True(tasks.Success);
+        Assert.Single(tasks.ResultObject);
+    }
+
+
+    [Fact]
+    public async Task DeleteOne_ShouldCommit_When_All_Operations_Succeed()
+    {
+        // Arrange
+        var controller = CreateAuthenticatedController();
+        var userId = GetUserId(controller);
+
+        var createResult = await controller.Create(
+            new CategoryInputModel { Name = "ToDelete" }, 
+            CancellationToken.None);
+        
+        var created = Assert.IsType<OkObjectResult>(createResult).Value as CategoryResponseModel;
+        Assert.NotNull(created);
+
+        var categoryId = new ObjectId(created!.Id);
+        await InsertTaskAsync(userId, categoryId, cancellationToken: CancellationToken.None);
+
+        // Act: delete successfully
+        var deleteResult = await controller.DeleteOne(categoryId, CancellationToken.None);
+
+        // Assert: deletion should succeed
+        var ok = Assert.IsType<OkObjectResult>(deleteResult);
+        Assert.Equal(StatusCodes.Status200OK, ok.StatusCode);
+
+        // Verify category is deleted
+        var getResult = await controller.GetOne(categoryId.ToString(), CancellationToken.None);
+        Assert.IsType<NotFoundResult>(getResult);
+
+        // Verify tasks are deleted
+        var tasksRepo = TestPreparationData.CreateRepository<TaskPlanner.API.Data.Models.Task>(this._mongoFixture);
+        var tasks = await tasksRepo.GetAsync(
+            Builders<TaskPlanner.API.Data.Models.Task>.Filter.Eq(x => x.CategoryId, categoryId),
+            CancellationToken.None);
+        
+        Assert.True(tasks.Success);
+        Assert.Empty(tasks.ResultObject);
+    }
+
+    [Fact]
+    public async Task DeleteMany_ShouldCommit_When_All_Operations_Succeed()
+    {
+        // Arrange
+        var controller = CreateAuthenticatedController();
+        var userId = GetUserId(controller);
+
+        var c1Result = await controller.Create(new CategoryInputModel { Name = "C1" }, CancellationToken.None);
+        var c2Result = await controller.Create(new CategoryInputModel { Name = "C2" }, CancellationToken.None);
+        
+        var c1 = Assert.IsType<OkObjectResult>(c1Result).Value as CategoryResponseModel;
+        var c2 = Assert.IsType<OkObjectResult>(c2Result).Value as CategoryResponseModel;
+
+        var c1Id = new ObjectId(c1!.Id);
+        var c2Id = new ObjectId(c2!.Id);
+
+        await InsertTaskAsync(userId, c1Id, cancellationToken: CancellationToken.None);
+        await InsertTaskAsync(userId, c2Id, cancellationToken: CancellationToken.None);
+
+        // Act: delete successfully
+        var deleteResult = await controller.DeleteMany(new[] { c1Id, c2Id }, CancellationToken.None);
+
+        // Assert: deletion should succeed
+        var ok = Assert.IsType<OkObjectResult>(deleteResult);
+        Assert.Equal(2L, ok.Value);
+
+        // Verify categories are deleted
+        Assert.IsType<NotFoundResult>(await controller.GetOne(c1Id.ToString(), CancellationToken.None));
+        Assert.IsType<NotFoundResult>(await controller.GetOne(c2Id.ToString(), CancellationToken.None));
+
+        // Verify tasks are deleted
+        var tasksRepo = TestPreparationData.CreateRepository<TaskPlanner.API.Data.Models.Task>(this._mongoFixture);
+        var tasks = await tasksRepo.GetAsync(
+            Builders<TaskPlanner.API.Data.Models.Task>.Filter.In(x => x.CategoryId, new[] { c1Id, c2Id }),
+            CancellationToken.None);
+        
+        Assert.True(tasks.Success);
+        Assert.Empty(tasks.ResultObject);
+    }
+    
     private static ObjectId GetUserId(CategoryController controller)
     {
         var id = controller.ControllerContext.HttpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
         return ObjectId.Parse(id!);
+    }
+    
+    private static void SetUserId(CategoryController controller, ObjectId userId)
+    {
+        var claims = new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, userId.ToString())
+        };
+
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext
+            {
+                User = new ClaimsPrincipal(new ClaimsIdentity(claims, "TestAuth"))
+            }
+        };
     }
     
     private async Task<TaskPlanner.API.Data.Models.Task> InsertTaskAsync(ObjectId userId, ObjectId categoryId, ObjectId? taskId = null, CancellationToken cancellationToken = default)

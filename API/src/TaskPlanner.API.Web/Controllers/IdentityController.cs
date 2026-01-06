@@ -10,7 +10,7 @@ namespace TaskPlanner.API.Web.Controllers;
 /// Exposes endpoints for user authentication and registration
 /// </summary>
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/identity")]
 public class IdentityController : ControllerBase
 {
     private readonly IIdentityService _identityService;

@@ -18,7 +18,7 @@ namespace TaskPlanner.API.Web.Controllers;
 /// Exposes endpoints for managing categories for the authenticated user
 /// </summary>
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/category")]
 [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
 public class CategoryController : ControllerBase
 {

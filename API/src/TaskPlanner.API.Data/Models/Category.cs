@@ -1,5 +1,6 @@
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
+using TaskPlanner.API.Data.Attributes;
 using TaskPlanner.API.Data.Interfaces;
 
 namespace TaskPlanner.API.Data.Models;
@@ -7,6 +8,7 @@ namespace TaskPlanner.API.Data.Models;
 /// <summary>
 /// Represents a category entity stored in the database
 /// </summary>
+[MongoCollection("Categories")]
 public class Category : IEntity
 {
     /// <summary>

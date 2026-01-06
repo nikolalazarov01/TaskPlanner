@@ -1,0 +1,17 @@
+﻿using TaskPlanner.API.Data.Models;
+using TaskStatus = TaskPlanner.API.Data.Models.TaskStatus;
+
+namespace TaskPlanner.API.Core.Models.Task;
+
+public class CreateTaskInputModel
+{
+    public required string Description { get; set; }
+
+    public DateTime? Deadline { get; set; }
+
+    public TaskPriority? Priority { get; set; }
+
+    public TaskStatus? Status { get; set; }
+
+    public int? EstimatedMinutes { get; set; }
+}

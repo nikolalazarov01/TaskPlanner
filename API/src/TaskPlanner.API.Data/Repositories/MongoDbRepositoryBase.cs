@@ -1,5 +1,6 @@
 using MongoDB.Driver;
 using OneBitSoftware.Utilities;
+using TaskPlanner.API.Data.Extensions;
 using TaskPlanner.API.Data.Interfaces;
 using TaskPlanner.API.Utilities;
 
@@ -9,21 +10,23 @@ namespace TaskPlanner.API.Data.Repositories;
 public class MongoDbRepositoryBase<TEntity> : IBaseRepository<TEntity>
     where TEntity : IEntity
 {
-    public MongoDbRepositoryBase(IMongoDatabase database, string collectionName)
+    private readonly ITransactionManager _transactionsManager;
+    
+    public MongoDbRepositoryBase(IMongoDatabase database, ITransactionManager transactionsManager, string? collectionName = null)
     {
         Database = database ?? throw new ArgumentNullException(nameof(database));
+        _transactionsManager = transactionsManager;
 
-        if (string.IsNullOrWhiteSpace(collectionName))
-        {
-            throw new ArgumentException("Collection name must be provided.", nameof(collectionName));
-        }
+        collectionName ??= this.ResolveCollectionName();
 
         Collection = database.GetCollection<TEntity>(collectionName);
     }
 
     protected IMongoDatabase Database { get; }
 
-    protected IMongoCollection<TEntity> Collection { get; }
+    private IMongoCollection<TEntity> Collection { get; }
+    
+    private IClientSessionHandle? Session => _transactionsManager.CurrentSession();
     
     /// <inheritdoc/>
     public async Task<OperationResult<TEntity>> CreateAsync(TEntity entity)
@@ -40,6 +43,85 @@ public class MongoDbRepositoryBase<TEntity> : IBaseRepository<TEntity>
         }
 
         return operationResult.WithRelatedObject(entity);
+    }
+    
+    /// <inheritdoc/>
+    public async Task<OperationResult<TEntity>> UpdateAsync(TEntity entity, CancellationToken cancellationToken)
+    {
+        var result = new OperationResult<TEntity>();
+
+        try
+        {
+            var filter = Builders<TEntity>.Filter.Eq(e => e.Id, entity.Id);
+
+            var options = new FindOneAndReplaceOptions<TEntity>
+            {
+                IsUpsert = false,
+                ReturnDocument = ReturnDocument.After
+            };
+
+            var updatedEntity = await Collection.FindOneAndReplaceAsync(filter, entity, options, cancellationToken);
+
+            if (updatedEntity is null) return result.AppendError("Entity not found.");;
+            
+            return result.WithRelatedObject(updatedEntity);
+        }
+        catch (MongoWriteException e) when
+            (e.WriteError?.Category == ServerErrorCategory.DuplicateKey)
+        {
+            result.AppendError(new DuplicateKeyError(e.WriteError.Message));
+            return result;
+        }
+        catch (Exception ex)
+        {
+            result.AppendError(ex.Message);
+            return result;
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<OperationResult<long>> UpdateManyAsync(FilterDefinition<TEntity> filter, UpdateDefinition<TEntity> update, CancellationToken cancellationToken)
+    {
+        var result = new OperationResult<long>();
+
+        try
+        {
+            if (filter is null)
+            {
+                filter = Builders<TEntity>.Filter.Empty;
+            }
+
+            if (update is null)
+            {
+                result.AppendError("Update definition must be provided.");
+                return result;
+            }
+
+            var updateResult = await Collection.UpdateManyAsync(
+                filter,
+                update,
+                cancellationToken: cancellationToken);
+
+            // Optional "not found" semantics
+            if (updateResult.MatchedCount == 0)
+            {
+                result.AppendError(new NotFoundError("No entities found to update."));
+                return result;
+            }
+
+            return result.WithRelatedObject(updateResult.ModifiedCount);
+        }
+        catch (MongoWriteException e) when
+            (e.WriteError?.Category == ServerErrorCategory.DuplicateKey)
+        {
+            result.AppendError(new DuplicateKeyError(e.WriteError.Message));
+            return result;
+        }
+        catch (Exception ex)
+        {
+            result.AppendError(ex.Message);
+            return result;
+        }
     }
     
     /// <inheritdoc/>
@@ -71,6 +153,54 @@ public class MongoDbRepositoryBase<TEntity> : IBaseRepository<TEntity>
             (e.WriteError?.Category == ServerErrorCategory.DuplicateKey)
         {
             result.AppendError(new DuplicateKeyError(e.WriteError.Message));
+            return result;
+        }
+    }
+    
+    /// <inheritdoc/>
+    public async Task<OperationResult<long>> ModifyManyAsync(FilterDefinition<TEntity> filter, UpdateDefinition<TEntity> update, CancellationToken cancellationToken, bool isUpsert = false)
+    {
+        var result = new OperationResult<long>();
+
+        try
+        {
+            filter ??= Builders<TEntity>.Filter.Empty;
+
+            if (update is null)
+            {
+                result.AppendError("Update definition must be provided.");
+                return result;
+            }
+
+            var options = new UpdateOptions
+            {
+                IsUpsert = isUpsert
+            };
+
+            var updateResult = await Collection.UpdateManyAsync(
+                filter,
+                update,
+                options,
+                cancellationToken);
+
+            // Optional "not found" semantics (only when not upserting)
+            if (!isUpsert && updateResult.MatchedCount == 0)
+            {
+                result.AppendError(new NotFoundError("No entities found to modify."));
+                return result;
+            }
+
+            return result.WithRelatedObject(updateResult.ModifiedCount);
+        }
+        catch (MongoWriteException e) when
+            (e.WriteError?.Category == ServerErrorCategory.DuplicateKey)
+        {
+            result.AppendError(new DuplicateKeyError(e.WriteError.Message));
+            return result;
+        }
+        catch (Exception ex)
+        {
+            result.AppendError(ex.Message);
             return result;
         }
     }
@@ -148,7 +278,9 @@ public class MongoDbRepositoryBase<TEntity> : IBaseRepository<TEntity>
             filter ??= Builders<TEntity>.Filter.Empty;
 
             // Return deleted entity (useful for controller/service mapping)
-            var deleted = await Collection.FindOneAndDeleteAsync(filter, cancellationToken: cancellationToken);
+            var deleted = Session is null
+                ? await Collection.FindOneAndDeleteAsync(filter, cancellationToken: cancellationToken)
+                : await Collection.FindOneAndDeleteAsync(Session, filter, cancellationToken: cancellationToken);
 
             if (deleted is null)
             {
@@ -174,16 +306,35 @@ public class MongoDbRepositoryBase<TEntity> : IBaseRepository<TEntity>
         {
             filter ??= Builders<TEntity>.Filter.Empty;
 
-            var deleteResult = await Collection.DeleteManyAsync(filter, cancellationToken);
+            var deleteResult = Session is null
+                ? await Collection.DeleteManyAsync(filter, cancellationToken)
+                : await Collection.DeleteManyAsync(Session, filter, cancellationToken: cancellationToken);
 
             // If you want "not found" semantics when nothing was deleted:
-            if (deleteResult.DeletedCount == 0)
-            {
-                result.AppendError(new NotFoundError("No entities found to delete."));
-                return result;
-            }
+            if (deleteResult.DeletedCount == 0) return result;
+            
 
             return result.WithRelatedObject(deleteResult.DeletedCount);
+        }
+        catch (Exception ex)
+        {
+            result.AppendError(ex.Message);
+            return result;
+        }
+    }
+    
+    /// <inheritdoc/>
+    public async Task<OperationResult<bool>> AnyAsync(FilterDefinition<TEntity> filter, CancellationToken cancellationToken)
+    {
+        var result = new OperationResult<bool>();
+
+        try
+        {
+            filter ??= Builders<TEntity>.Filter.Empty;
+
+            var any = await Collection.Find(filter).AnyAsync(cancellationToken);
+
+            return result.WithRelatedObject(any);
         }
         catch (Exception ex)
         {

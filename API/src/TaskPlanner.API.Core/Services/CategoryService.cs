@@ -5,6 +5,7 @@ using TaskPlanner.API.Core.Interfaces;
 using TaskPlanner.API.Core.Models.Category;
 using TaskPlanner.API.Data.Interfaces;
 using TaskPlanner.API.Data.Models;
+using TaskPlanner.API.Utilities;
 using TaskPlanner.API.Utilities.Constants;
 
 namespace TaskPlanner.API.Core.Services;
@@ -92,22 +93,60 @@ public class CategoryService : ICategoryService
     }
     
     /// <inheritdoc/>
-    public async Task<OperationResult<Category>> DeleteCategory(string categoryId, ObjectId userId, CancellationToken cancellationToken)
+    public async Task<OperationResult<Category>> DeleteCategory(ObjectId categoryId, ObjectId userId, CancellationToken cancellationToken)
     {
         var result = new OperationResult<Category>();
+        
+        if (categoryId == ObjectId.Empty)
+            return result.AppendError("Invalid category id.");
 
-        if (!ObjectId.TryParse(categoryId, out var id))
-        {
-            result.AppendError("Invalid category id.");
-            return result;
-        }
+        if (userId == ObjectId.Empty)
+            return result.AppendError("Invalid user id.");
 
         var filter = Builders<Category>.Filter.And(
-            Builders<Category>.Filter.Eq(x => x.Id, id),
+            Builders<Category>.Filter.Eq(x => x.Id, categoryId),
             Builders<Category>.Filter.Eq(x => x.UserId, userId)
         );
 
         return await _repository.DeleteOneAsync(filter, cancellationToken);
+    }
+    
+    /// <inheritdoc/>
+    public async Task<OperationResult<long>> DeleteCategories(ObjectId[] categoryIds, ObjectId userId, CancellationToken cancellationToken)
+    {
+        var operationResult = new OperationResult<long>();
+
+        if (userId == ObjectId.Empty)
+            return operationResult.AppendError("Invalid user id.");
+
+        if (categoryIds.Any(x => x == ObjectId.Empty))
+            return operationResult.AppendError("Invalid category id.");
+
+        var filter = Builders<Category>.Filter.And(
+            Builders<Category>.Filter.Eq(x => x.UserId, userId),
+            Builders<Category>.Filter.In(x => x.Id, categoryIds)
+        );
+
+        // Ensure all exist for this user (so we keep the "all-or-nothing" semantics)
+        var existing = await _repository.GetAsync(filter, cancellationToken);
+        if (!existing.Success)
+            return operationResult.AppendErrors(existing);
+
+        var foundCount = existing.ResultObject?.Count ?? 0;
+        if (foundCount != categoryIds.Length)
+        {
+            var existingIds = existing.ResultObject?.Select(x => x.Id).ToHashSet() ?? new HashSet<ObjectId>();
+            var missing = categoryIds.Where(id => !existingIds.Contains(id)).ToList();
+
+            operationResult.AppendError(new NotFoundError($"Some categories were not found: {string.Join(", ", missing)}"));
+            return operationResult;
+        }
+
+        var deleted = await _repository.DeleteManyAsync(filter, cancellationToken);
+        if (!deleted.Success)
+            return operationResult.AppendErrors(deleted);
+
+        return operationResult.WithRelatedObject(deleted.ResultObject);
     }
     
     /// <inheritdoc/>

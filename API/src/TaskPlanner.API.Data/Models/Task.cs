@@ -1,5 +1,6 @@
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
+using TaskPlanner.API.Data.Attributes;
 using TaskPlanner.API.Data.Interfaces;
 
 namespace TaskPlanner.API.Data.Models;
@@ -7,6 +8,7 @@ namespace TaskPlanner.API.Data.Models;
 /// <summary>
 /// Represents a task entity stored in the database
 /// </summary>
+[MongoCollection("Tasks")]
 public class Task : IEntity
 {
     /// <summary>
@@ -26,7 +28,7 @@ public class Task : IEntity
     /// Optional identifier of the category this task belongs to
     /// </summary>
     [BsonRepresentation(BsonType.ObjectId)]
-    public ObjectId? CategoryId { get; set; }
+    public ObjectId CategoryId { get; set; }
 
     /// <summary>
     /// The description or title of the task

@@ -9,7 +9,6 @@ using MongoDB.Driver;
 using TaskPlanner.API.Core.Models.Task;
 using TaskPlanner.API.Core.Services;
 using TaskPlanner.API.Data.Models;
-using TaskPlanner.API.Data.Repositories;
 using TaskPlanner.API.Web.Controllers;
 using TaskPlanner.API.Web.Mapping;
 using TaskPlanner.API.Web.Validation;

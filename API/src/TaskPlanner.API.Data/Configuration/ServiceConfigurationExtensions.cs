@@ -3,11 +3,11 @@ using MongoDB.Driver;
 using TaskPlanner.API.Data.Interfaces;
 using TaskPlanner.API.Data.Transactions;
 
-namespace TaskPlanner.API.Data.Extensions;
+namespace TaskPlanner.API.Data.Configuration;
 
 public static class ServiceConfigurationExtensions
 {
-    public static void SetupServices(this IServiceCollection services)
+    public static void SetupDataServices(this IServiceCollection services)
     {
         services.AddSingleton<ITransactionsContainer<IClientSessionHandle>, TransactionsContainer<IClientSessionHandle>>();
         services.AddSingleton<ITransactionManager, MongoTransactionManager>();

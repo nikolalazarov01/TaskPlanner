@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { taskApi, categoryApi } from '../services/api';
 import type { TaskResponseModel, CategoryResponseModel } from '../types';
 import { TaskPriority } from '../types';
+import { AddTaskDialog } from './AddTaskDialog';
 
 type SortOption = 'deadline' | 'estimatedMinutes' | 'none';
 type GroupByPriority = boolean;
@@ -16,6 +17,7 @@ export const Tasks: React.FC = () => {
   const [error, setError] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('none');
   const [groupByPriority, setGroupByPriority] = useState<GroupByPriority>(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { logout } = useAuth();
   const navigate = useNavigate();
 
@@ -128,6 +130,7 @@ export const Tasks: React.FC = () => {
     };
   };
 
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
@@ -172,7 +175,13 @@ export const Tasks: React.FC = () => {
         )}
 
         {/* Controls */}
-        <div className="mb-6 flex flex-wrap gap-4">
+        <div className="mb-6 flex flex-wrap gap-4 items-center">
+          <button
+            onClick={() => setIsDialogOpen(true)}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition"
+          >
+            Add Task
+          </button>
           <button
             onClick={() => setGroupByPriority(!groupByPriority)}
             className={`px-4 py-2 rounded-lg font-semibold transition ${
@@ -210,7 +219,13 @@ export const Tasks: React.FC = () => {
         {/* Tasks Table */}
         {tasks.length === 0 ? (
           <div className="text-center py-16">
-            <p className="text-gray-400 text-lg">No tasks in this category</p>
+            <p className="text-gray-400 text-lg mb-4">No tasks in this category</p>
+            <button
+              onClick={() => setIsDialogOpen(true)}
+              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition"
+            >
+              Create your first task
+            </button>
           </div>
         ) : (
           <div className="space-y-8">
@@ -272,6 +287,17 @@ export const Tasks: React.FC = () => {
           </div>
         )}
       </main>
+
+      {/* Add Task Dialog */}
+      {categoryId && (
+        <AddTaskDialog
+          isOpen={isDialogOpen}
+          onClose={() => setIsDialogOpen(false)}
+          categoryId={categoryId}
+          onSuccess={loadTasks}
+          onError={(errorMessage) => setError(errorMessage)}
+        />
+      )}
     </div>
   );
 };

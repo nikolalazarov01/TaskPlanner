@@ -14,7 +14,7 @@ using TaskStatus = TaskPlanner.API.Data.Models.TaskStatus;
 namespace TaskPlanner.API.Web.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/task")]
 [Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
 public class TaskController : ControllerBase
 {

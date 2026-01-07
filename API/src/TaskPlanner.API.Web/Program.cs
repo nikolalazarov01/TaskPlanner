@@ -1,4 +1,6 @@
 using System.Text;
+using System.Text.Json.Serialization;
+using AutoMapper;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using MongoDB.Driver;
@@ -7,6 +9,7 @@ using TaskPlanner.API.Core.Interfaces;
 using TaskPlanner.API.Core.Models;
 using TaskPlanner.API.Core.Models.Identity;
 using TaskPlanner.API.Core.Services;
+using TaskPlanner.API.Data.Configuration;
 using TaskPlanner.API.Data.Interfaces;
 using TaskPlanner.API.Data.Repositories;
 using TaskPlanner.API.Web.Configuration;
@@ -14,7 +17,25 @@ using TaskPlanner.API.Web.Configuration;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddControllers();
+builder.Services.AddControllers().AddJsonOptions(o =>
+{
+    o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+});;
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("ViteDev", policy =>
+        policy
+            .WithOrigins(
+                "http://127.0.0.1:5173",
+                "http://localhost:5173"
+            )
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials()
+    );
+});
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -26,7 +47,7 @@ builder.Services.Configure<JwtOptions>(jwtSection);
 
 builder.Services.AddSingleton<IMongoClient>(_ =>
 {
-    var connectionString = mongoSection["ConnectionString"] ?? "mongodb://localhost:27017";
+    var connectionString = mongoSection["ConnectionString"] ?? "mongodb://localhost:27017/?replicaSet=rs0&directConnection=true";
     return new MongoClient(connectionString);
 });
 
@@ -38,9 +59,22 @@ builder.Services.AddScoped<IMongoDatabase>(sp =>
 });
 
 builder.Services.SetupServices();
+builder.Services.SetupDataServices();
 builder.Services.SetupValidation();
 
-builder.Services.AddAutoMapper(typeof(Program));
+builder.Services.AddScoped<IMapper>(sp =>
+{
+    var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
+
+    var config = new MapperConfiguration(cfg =>
+    {
+        cfg.AddMaps(AppDomain.CurrentDomain.GetAssemblies());
+    }, loggerFactory);
+
+    config.AssertConfigurationIsValid();
+
+    return config.CreateMapper();
+});
 
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -68,6 +102,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.UseCors("ViteDev");
 
 app.UseAuthentication();
 app.UseAuthorization();

@@ -60,6 +60,17 @@ export const Categories: React.FC = () => {
     }
   };
 
+  const handleDeleteCategory = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await categoryApi.delete(id);
+      await loadCategories();
+    } catch (err) {
+      setError('Failed to delete category');
+      console.error(err);
+    }
+  };
+
   const handleShowMore = () => {
     setCurrentPage((prev) => prev + 1);
   };
@@ -130,9 +141,16 @@ export const Categories: React.FC = () => {
                 <div
                   key={category.id}
                   onClick={() => navigate(`/categories/${category.id}/tasks`)}
-                  className="cursor-pointer rounded-lg p-6 text-white shadow-lg hover:scale-105 transition-transform"
+                  className="relative cursor-pointer rounded-lg p-6 text-white shadow-lg hover:scale-105 transition-transform"
                   style={getCardStyle(category.color)}
                 >
+                  <button
+                    aria-label="Delete category"
+                    onClick={(e) => handleDeleteCategory(category.id, e)}
+                    className="absolute top-3 right-3 text-white/80 hover:text-white bg-black/20 hover:bg-black/30 rounded-full w-8 h-8 flex items-center justify-center"
+                  >
+                    ×
+                  </button>
                   <h3 className="text-xl font-bold mb-2">{category.name}</h3>
                   <p className="text-sm opacity-90">
                     {category.sortOrder !== undefined && `Order: ${category.sortOrder}`}

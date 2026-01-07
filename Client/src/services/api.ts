@@ -72,6 +72,11 @@ export const categoryApi = {
     const response = await apiClient.patch<CategoryResponseModel>('/category', data);
     return response.data;
   },
+
+  delete: async (id: string): Promise<CategoryResponseModel> => {
+    const response = await apiClient.delete<CategoryResponseModel>(`/category/${id}`);
+    return response.data;
+  },
 };
 
 // Task API
@@ -90,6 +95,11 @@ export const taskApi = {
 
   create: async (data: CreateTaskInputModel, categoryId: string): Promise<TaskResponseModel> => {
     const response = await apiClient.post<TaskResponseModel>(`/task?categoryId=${categoryId}`, data);
+    return response.data;
+  },
+
+  delete: async (id: string): Promise<TaskResponseModel> => {
+    const response = await apiClient.delete<TaskResponseModel>(`/task/${id}`);
     return response.data;
   },
 };

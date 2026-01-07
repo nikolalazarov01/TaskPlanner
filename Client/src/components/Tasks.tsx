@@ -130,6 +130,16 @@ export const Tasks: React.FC = () => {
     };
   };
 
+  const handleDeleteTask = async (id: string) => {
+    try {
+      await taskApi.delete(id);
+      await loadTasks();
+    } catch (err) {
+      setError('Failed to delete task');
+      console.error(err);
+    }
+  };
+
 
   if (loading) {
     return (
@@ -253,6 +263,9 @@ export const Tasks: React.FC = () => {
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                             Priority
                           </th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
+                            Actions
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-700">
@@ -275,6 +288,15 @@ export const Tasks: React.FC = () => {
                               <div className={`text-sm font-semibold ${getPriorityColor(task.priority)}`}>
                                 {task.priority || 'Medium'}
                               </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-right">
+                              <button
+                                aria-label="Delete task"
+                                onClick={() => handleDeleteTask(task.id)}
+                                className="text-white/80 hover:text-white bg-black/20 hover:bg-black/30 rounded-full w-8 h-8 flex items-center justify-center"
+                              >
+                                ×
+                              </button>
                             </td>
                           </tr>
                         ))}

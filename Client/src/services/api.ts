@@ -7,6 +7,7 @@ import type {
   CategoryResponseModel,
   CreateTaskInputModel,
   TaskResponseModel,
+  TaskStatus,
 } from '../types';
 
 const API_BASE_URL = 'https://localhost:44358/api';
@@ -100,6 +101,11 @@ export const taskApi = {
 
   delete: async (id: string): Promise<TaskResponseModel> => {
     const response = await apiClient.delete<TaskResponseModel>(`/task/${id}`);
+    return response.data;
+  },
+
+  updateStatus: async (id: string, status: TaskStatus): Promise<number> => {
+    const response = await apiClient.patch<number>(`/task/update-status?taskId=${id}&status=${status}`);
     return response.data;
   },
 };

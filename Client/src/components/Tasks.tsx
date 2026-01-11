@@ -3,11 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { taskApi, categoryApi } from '../services/api';
 import type { TaskResponseModel, CategoryResponseModel } from '../types';
-import { TaskPriority } from '../types';
+import { TaskPriority, TaskStatus } from '../types';
 import { AddTaskDialog } from './AddTaskDialog';
-
-type SortOption = 'deadline' | 'estimatedMinutes' | 'none';
-type GroupByPriority = boolean;
+import { TaskInfoDialog } from './TaskInfoDialog';
 
 export const Tasks: React.FC = () => {
   const { categoryId } = useParams<{ categoryId: string }>();
@@ -15,9 +13,10 @@ export const Tasks: React.FC = () => {
   const [category, setCategory] = useState<CategoryResponseModel | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [sortBy, setSortBy] = useState<SortOption>('none');
-  const [groupByPriority, setGroupByPriority] = useState<GroupByPriority>(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<TaskResponseModel | null>(null);
+  const [isInfoDialogOpen, setIsInfoDialogOpen] = useState(false);
+  const [draggedTask, setDraggedTask] = useState<TaskResponseModel | null>(null);
   const { logout } = useAuth();
   const navigate = useNavigate();
 
@@ -52,46 +51,6 @@ export const Tasks: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const getSortedTasks = (): TaskResponseModel[] => {
-    let sorted = [...tasks];
-
-    if (sortBy === 'deadline') {
-      sorted.sort((a, b) => {
-        if (!a.deadline && !b.deadline) return 0;
-        if (!a.deadline) return 1;
-        if (!b.deadline) return -1;
-        return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
-      });
-    } else if (sortBy === 'estimatedMinutes') {
-      sorted.sort((a, b) => {
-        const aEst = a.estimatedMinutes ?? 0;
-        const bEst = b.estimatedMinutes ?? 0;
-        return aEst - bEst;
-      });
-    }
-
-    return sorted;
-  };
-
-  const getGroupedTasks = (): Record<string, TaskResponseModel[]> => {
-    if (!groupByPriority) {
-      return { 'All Tasks': getSortedTasks() };
-    }
-
-    const grouped: Record<string, TaskResponseModel[]> = {
-      High: [],
-      Medium: [],
-      Low: [],
-    };
-
-    getSortedTasks().forEach((task) => {
-      const priority = task.priority || TaskPriority.Medium;
-      grouped[priority].push(task);
-    });
-
-    return grouped;
   };
 
   const formatDate = (dateString?: string): string => {
@@ -130,7 +89,12 @@ export const Tasks: React.FC = () => {
     };
   };
 
-  const handleDeleteTask = async (id: string) => {
+  const getTasksByStatus = (status: TaskStatus): TaskResponseModel[] => {
+    return tasks.filter(task => (task.status || TaskStatus.Todo) === status);
+  };
+
+  const handleDeleteTask = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
     try {
       await taskApi.delete(id);
       await loadTasks();
@@ -140,6 +104,48 @@ export const Tasks: React.FC = () => {
     }
   };
 
+  const handleDragStart = (e: React.DragEvent, task: TaskResponseModel) => {
+    setDraggedTask(task);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetStatus: TaskStatus) => {
+    e.preventDefault();
+    if (!draggedTask) return;
+
+    const currentStatus = draggedTask.status || TaskStatus.Todo;
+    if (currentStatus === targetStatus) {
+      setDraggedTask(null);
+      return;
+    }
+
+    try {
+      await taskApi.updateStatus(draggedTask.id, targetStatus);
+      await loadTasks();
+    } catch (err) {
+      setError('Failed to update task status');
+      console.error(err);
+    } finally {
+      setDraggedTask(null);
+    }
+  };
+
+  const handleInfoClick = (task: TaskResponseModel, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedTask(task);
+    setIsInfoDialogOpen(true);
+  };
+
+  const statusColumns: { status: TaskStatus; label: string }[] = [
+    { status: TaskStatus.Todo, label: 'To Do' },
+    { status: TaskStatus.InProgress, label: 'In Progress' },
+    { status: TaskStatus.Done, label: 'Done' },
+  ];
 
   if (loading) {
     return (
@@ -148,8 +154,6 @@ export const Tasks: React.FC = () => {
       </div>
     );
   }
-
-  const groupedTasks = getGroupedTasks();
 
   return (
     <div className="min-h-screen bg-gray-900">
@@ -185,48 +189,16 @@ export const Tasks: React.FC = () => {
         )}
 
         {/* Controls */}
-        <div className="mb-6 flex flex-wrap gap-4 items-center">
+        <div className="mb-6">
           <button
             onClick={() => setIsDialogOpen(true)}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition"
           >
             Add Task
           </button>
-          <button
-            onClick={() => setGroupByPriority(!groupByPriority)}
-            className={`px-4 py-2 rounded-lg font-semibold transition ${
-              groupByPriority
-                ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
-            }`}
-          >
-            {groupByPriority ? 'Ungroup by Priority' : 'Group by Priority'}
-          </button>
-
-          <button
-            onClick={() => setSortBy(sortBy === 'deadline' ? 'none' : 'deadline')}
-            className={`px-4 py-2 rounded-lg font-semibold transition ${
-              sortBy === 'deadline'
-                ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
-            }`}
-          >
-            {sortBy === 'deadline' ? '✓ Sort by Deadline' : 'Sort by Deadline'}
-          </button>
-
-          <button
-            onClick={() => setSortBy(sortBy === 'estimatedMinutes' ? 'none' : 'estimatedMinutes')}
-            className={`px-4 py-2 rounded-lg font-semibold transition ${
-              sortBy === 'estimatedMinutes'
-                ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
-            }`}
-          >
-            {sortBy === 'estimatedMinutes' ? '✓ Sort by Estimation' : 'Sort by Estimation'}
-          </button>
         </div>
 
-        {/* Tasks Table */}
+        {/* Kanban Board */}
         {tasks.length === 0 ? (
           <div className="text-center py-16">
             <p className="text-gray-400 text-lg mb-4">No tasks in this category</p>
@@ -238,70 +210,66 @@ export const Tasks: React.FC = () => {
             </button>
           </div>
         ) : (
-          <div className="space-y-8">
-            {Object.entries(groupedTasks).map(([groupName, groupTasks]) => {
-              if (groupTasks.length === 0) return null;
-
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {statusColumns.map(({ status, label }) => {
+              const statusTasks = getTasksByStatus(status);
               return (
-                <div key={groupName}>
-                  {groupByPriority && (
-                    <h2 className="text-xl font-bold text-white mb-4">{groupName} Priority</h2>
-                  )}
-                  <div className="bg-gray-800 rounded-lg overflow-hidden">
-                    <table className="w-full">
-                      <thead className="bg-gray-700">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                            Description
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                            Deadline
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                            Estimated
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                            Priority
-                          </th>
-                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
-                            Actions
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-700">
-                        {groupTasks.map((task) => (
-                          <tr
-                            key={task.id}
-                            className="hover:bg-gray-750"
-                            style={getCardStyle(category?.color)}
+                <div
+                  key={status}
+                  className="bg-gray-800 rounded-lg p-4 min-h-[400px]"
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleDrop(e, status)}
+                >
+                  <h2 className="text-xl font-bold text-white mb-4">{label}</h2>
+                  <div className="space-y-3">
+                    {statusTasks.map((task) => (
+                      <div
+                        key={task.id}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, task)}
+                        className="bg-gray-700 rounded-lg p-4 cursor-move hover:bg-gray-600 transition relative"
+                        style={getCardStyle(category?.color)}
+                      >
+                        {/* X button - top right */}
+                        <button
+                          aria-label="Delete task"
+                          onClick={(e) => handleDeleteTask(task.id, e)}
+                          className="absolute top-2 right-2 text-white/80 hover:text-white bg-black/20 hover:bg-black/30 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold"
+                        >
+                          ×
+                        </button>
+
+                        {/* Task name - bold and big */}
+                        <div className="font-bold text-lg text-white mb-2 pr-6">
+                          {task.description}
+                        </div>
+
+                        {/* Priority, deadline, estimation - small font */}
+                        <div className="text-xs text-gray-300 space-y-1 mb-4">
+                          <div className={`font-semibold ${getPriorityColor(task.priority)}`}>
+                            Priority: {task.priority || 'Medium'}
+                          </div>
+                          <div>Deadline: {formatDate(task.deadline)}</div>
+                          <div>Estimation: {formatEstimatedMinutes(task.estimatedMinutes)}</div>
+                        </div>
+
+                        {/* Info button - bottom right */}
+                        <div className="flex justify-end">
+                          <button
+                            onClick={(e) => handleInfoClick(task, e)}
+                            className="text-white/80 hover:text-white bg-black/20 hover:bg-black/30 rounded px-3 py-1 text-xs font-semibold transition"
+                            aria-label="View task details"
                           >
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm font-medium text-white">{task.description}</div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-300">{formatDate(task.deadline)}</div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-300">{formatEstimatedMinutes(task.estimatedMinutes)}</div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className={`text-sm font-semibold ${getPriorityColor(task.priority)}`}>
-                                {task.priority || 'Medium'}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-right">
-                              <button
-                                aria-label="Delete task"
-                                onClick={() => handleDeleteTask(task.id)}
-                                className="text-white/80 hover:text-white bg-black/20 hover:bg-black/30 rounded-full w-8 h-8 flex items-center justify-center"
-                              >
-                                ×
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                            ℹ Info
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    {statusTasks.length === 0 && (
+                      <div className="text-gray-500 text-sm text-center py-8">
+                        No tasks
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -320,6 +288,16 @@ export const Tasks: React.FC = () => {
           onError={(errorMessage) => setError(errorMessage)}
         />
       )}
+
+      {/* Task Info Dialog */}
+      <TaskInfoDialog
+        isOpen={isInfoDialogOpen}
+        onClose={() => {
+          setIsInfoDialogOpen(false);
+          setSelectedTask(null);
+        }}
+        task={selectedTask}
+      />
     </div>
   );
 };

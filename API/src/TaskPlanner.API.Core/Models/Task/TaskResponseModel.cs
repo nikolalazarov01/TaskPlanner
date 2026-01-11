@@ -1,5 +1,5 @@
 ﻿using TaskPlanner.API.Data.Models;
-using TaskStatus = System.Threading.Tasks.TaskStatus;
+using TaskStatus = TaskPlanner.API.Data.Models.TaskStatus;
 
 namespace TaskPlanner.API.Core.Models.Task;
 

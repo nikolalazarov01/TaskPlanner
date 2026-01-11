@@ -16,6 +16,6 @@ public class TaskMappingProfile : Profile
             .ForMember(d => d.Deadline, o => o.MapFrom(s => s.Deadline))
             .ForMember(d => d.Priority, o => o.MapFrom(s => s.Priority))
             .ForMember(d => d.EstimatedMinutes, o => o.MapFrom(s => s.EstimatedMinutes))
-            .ForMember(d => d.Status, o => o.Ignore());
+            .ForMember(d => d.Status, o => o.MapFrom(s => s.Status));
     }
 }

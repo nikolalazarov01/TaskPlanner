@@ -404,31 +404,6 @@ public class TaskController : ControllerBase
         return Ok(deleteResult.ResultObject);
     }
     
-    /*private async Task<IActionResult> UpdateTaskStatusesInternal(ObjectId[] taskIds, TaskStatus status, CancellationToken cancellationToken)
-    {
-        if (taskIds is null || taskIds.Length == 0) return BadRequest();
-        if (taskIds.Any(x => x == ObjectId.Empty)) return BadRequest();
-
-        if (!this.TryGetUserObjectId(out var userId)) return Unauthorized();
-
-        // Call the proper service method based on "one vs many"
-        OperationResult<long> result = taskIds.Length == 1
-            ? await _taskService.ModifyTaskStatus(taskIds[0], userId, status, cancellationToken)
-            : await _taskService.ModifyManyTaskStatus(taskIds, userId, status, cancellationToken);
-
-        if (!result.Success)
-        {
-            if (result.Errors.Any(e => e is NotFoundError))
-                return NotFound(result.Errors);
-
-            return BadRequest(result.Errors);
-        }
-        
-        var changeStateLog = await this._taskLogService.
-
-        return Ok(result.ResultObject);
-    }*/
-    
     private async Task<IActionResult> UpdateTaskStatusesInternal(ObjectId[] taskIds, TaskStatus status, TaskStatus previousStatus, CancellationToken cancellationToken)
     {
         if (taskIds is null || taskIds.Length == 0) return BadRequest();
@@ -448,13 +423,10 @@ public class TaskController : ControllerBase
             return BadRequest(result.Errors);
         }
 
-        // Best-effort logging: do not block successful status update on log failures
         OperationResult logResult = taskIds.Length == 1
             ? await _taskLogService.LogStatusChange(userId, taskIds[0], previousStatus, status, cancellationToken)
             : await _taskLogService.LogBulkStatusChange(userId, taskIds, previousStatus, status, cancellationToken);
 
-        // If you want strict behavior, replace this with returning BadRequest on logResult failure.
-        // For now, ignore log errors (or optionally log them in server logs).
 
         return Ok(result.ResultObject);
     }

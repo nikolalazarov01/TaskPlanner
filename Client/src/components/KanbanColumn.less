@@ -1,0 +1,40 @@
+/* KanbanColumn.less */
+
+@card-height: 140px;
+@card-gap: 12px;
+@visible-cards: 3;
+
+/*
+  Max height = (card height * 3) + (gap * 2)
+*/
+@column-scroll-height: (@card-height * @visible-cards) + (@card-gap * (@visible-cards - 1));
+
+.kanban-column {
+  display: flex;
+  flex-direction: column;
+}
+
+.kanban-column__list {
+  max-height: @column-scroll-height;
+  overflow-y: auto;
+  padding-right: 4px;
+
+  /* smoother scrolling */
+  scrollbar-width: thin;
+}
+
+.kanban-column__list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.kanban-column__list::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+.kanban-card {
+  height: @card-height;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}

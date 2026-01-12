@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
+// Tasks.tsx (refactored)
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { taskApi, categoryApi } from '../services/api';
 import type { TaskResponseModel, CategoryResponseModel } from '../types';
-import { TaskPriority, TaskStatus } from '../types';
+import { TaskStatus } from '../types';
 import { AddTaskDialog } from './AddTaskDialog';
 import { TaskInfoDialog } from './TaskInfoDialog';
+import { KanbanBoard, type StatusColumnDef } from './KanbanBoard';
 
 export const Tasks: React.FC = () => {
   const { categoryId } = useParams<{ categoryId: string }>();
@@ -14,23 +16,25 @@ export const Tasks: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [initialTaskStatus, setInitialTaskStatus] = useState<TaskStatus | undefined>(undefined);
   const [selectedTask, setSelectedTask] = useState<TaskResponseModel | null>(null);
   const [isInfoDialogOpen, setIsInfoDialogOpen] = useState(false);
   const [draggedTask, setDraggedTask] = useState<TaskResponseModel | null>(null);
+
   const { logout } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     if (categoryId) {
-      loadCategory();
-      loadTasks();
+      void loadCategory(categoryId);
+      void loadTasks(categoryId);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categoryId]);
 
-  const loadCategory = async () => {
-    if (!categoryId) return;
+  const loadCategory = async (cid: string) => {
     try {
-      const data = await categoryApi.getOne(categoryId);
+      const data = await categoryApi.getOne(cid);
       setCategory(data);
     } catch (err) {
       setError('Failed to load category');
@@ -38,11 +42,10 @@ export const Tasks: React.FC = () => {
     }
   };
 
-  const loadTasks = async () => {
-    if (!categoryId) return;
+  const loadTasks = async (cid: string) => {
     try {
       setLoading(true);
-      const data = await taskApi.getAll(categoryId);
+      const data = await taskApi.getAll(cid);
       setTasks(data);
       setError('');
     } catch (err) {
@@ -53,99 +56,123 @@ export const Tasks: React.FC = () => {
     }
   };
 
-  const formatDate = (dateString?: string): string => {
+  const refreshTasks = useCallback(async () => {
+    if (!categoryId) return;
+    await loadTasks(categoryId);
+  }, [categoryId]);
+
+  const formatDate = useCallback((dateString?: string): string => {
     if (!dateString) return 'No deadline';
     const date = new Date(dateString);
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
+    return (
+      date.toLocaleDateString() +
+      ' ' +
+      date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    );
+  }, []);
 
-  const formatEstimatedMinutes = (minutes?: number): string => {
+  const formatEstimatedMinutes = useCallback((minutes?: number): string => {
     if (!minutes) return 'N/A';
     if (minutes < 60) return `${minutes}m`;
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
-  };
+  }, []);
 
-  const getPriorityColor = (priority?: TaskPriority): string => {
-    switch (priority) {
-      case TaskPriority.High:
-        return 'text-red-400';
-      case TaskPriority.Medium:
-        return 'text-yellow-400';
-      case TaskPriority.Low:
-        return 'text-green-400';
-      default:
-        return 'text-gray-400';
-    }
-  };
+  const handleDeleteTask = useCallback(
+    async (id: string) => {
+      try {
+        await taskApi.delete(id);
+        await refreshTasks();
+      } catch (err) {
+        setError('Failed to delete task');
+        console.error(err);
+      }
+    },
+    [refreshTasks]
+  );
 
-  const getCardStyle = (color?: string) => {
-    const bgColor = color || '#6B7280';
-    return {
-      backgroundColor: bgColor + '20',
-      borderLeftColor: bgColor,
-      borderLeftWidth: '4px',
-    };
-  };
-
-  const getTasksByStatus = (status: TaskStatus): TaskResponseModel[] => {
-    return tasks.filter(task => (task.status || TaskStatus.Todo) === status);
-  };
-
-  const handleDeleteTask = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      await taskApi.delete(id);
-      await loadTasks();
-    } catch (err) {
-      setError('Failed to delete task');
-      console.error(err);
-    }
-  };
-
-  const handleDragStart = (e: React.DragEvent, task: TaskResponseModel) => {
+  const handleDragStart = useCallback((e: React.DragEvent, task: TaskResponseModel) => {
     setDraggedTask(task);
     e.dataTransfer.effectAllowed = 'move';
-  };
 
-  const handleDragOver = (e: React.DragEvent) => {
+    // Custom drag image
+    const dragElement = e.currentTarget as HTMLElement;
+    const dragImage = dragElement.cloneNode(true) as HTMLElement;
+    dragImage.style.opacity = '0.95';
+    dragImage.style.transform = 'rotate(2deg)';
+    dragImage.style.position = 'absolute';
+    dragImage.style.top = '-1000px';
+    document.body.appendChild(dragImage);
+
+    const rect = dragElement.getBoundingClientRect();
+    const offsetX = e.clientX - rect.left;
+    const offsetY = e.clientY - rect.top;
+
+    e.dataTransfer.setDragImage(dragImage, offsetX, offsetY);
+
+    setTimeout(() => {
+      document.body.removeChild(dragImage);
+    }, 0);
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-  };
+  }, []);
 
-  const handleDrop = async (e: React.DragEvent, targetStatus: TaskStatus) => {
-    e.preventDefault();
-    if (!draggedTask) return;
+  // IMPORTANT: optimistic update so only the KanbanBoard subtree re-renders (not loading the whole page)
+  const handleDrop = useCallback(
+    async (e: React.DragEvent, targetStatus: TaskStatus) => {
+      e.preventDefault();
+      if (!draggedTask) return;
 
-    const currentStatus = draggedTask.status || TaskStatus.Todo;
-    if (currentStatus === targetStatus) {
+      const currentStatus = draggedTask.status || TaskStatus.Todo;
+      if (currentStatus === targetStatus) {
+        setDraggedTask(null);
+        return;
+      }
+
+      const draggedId = draggedTask.id;
+
+      // Optimistic update: update local state immediately
+      setTasks((prev) =>
+        prev.map((t) => (t.id === draggedId ? { ...t, status: targetStatus } : t))
+      );
       setDraggedTask(null);
-      return;
-    }
 
-    try {
-      await taskApi.updateStatus(draggedTask.id, targetStatus);
-      await loadTasks();
-    } catch (err) {
-      setError('Failed to update task status');
-      console.error(err);
-    } finally {
-      setDraggedTask(null);
-    }
-  };
+      try {
+        await taskApi.updateStatus(draggedId, targetStatus);
+        // Optional: reconcile with server without a global loading spinner
+        // await refreshTasks();
+      } catch (err) {
+        setError('Failed to update task status');
+        console.error(err);
+        // Revert (best-effort) by reloading from server
+        await refreshTasks();
+      }
+    },
+    [draggedTask, refreshTasks]
+  );
 
-  const handleInfoClick = (task: TaskResponseModel, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleInfoClick = useCallback((task: TaskResponseModel) => {
     setSelectedTask(task);
     setIsInfoDialogOpen(true);
-  };
+  }, []);
 
-  const statusColumns: { status: TaskStatus; label: string }[] = [
-    { status: TaskStatus.Todo, label: 'To Do' },
-    { status: TaskStatus.InProgress, label: 'In Progress' },
-    { status: TaskStatus.Done, label: 'Done' },
-  ];
+  const handleAddTask = useCallback((status?: TaskStatus) => {
+    setInitialTaskStatus(status);
+    setIsDialogOpen(true);
+  }, []);
+
+  const statusColumns: StatusColumnDef[] = useMemo(
+    () => [
+      { status: TaskStatus.Todo, label: 'To Do' },
+      { status: TaskStatus.InProgress, label: 'In Progress' },
+      { status: TaskStatus.Done, label: 'Done' },
+    ],
+    []
+  );
 
   if (loading) {
     return (
@@ -157,19 +184,13 @@ export const Tasks: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-900">
-      {/* Header */}
       <header className="bg-gray-800 border-b border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div className="flex items-center gap-4">
-            <button
-              onClick={() => navigate('/categories')}
-              className="text-gray-400 hover:text-white"
-            >
+            <button onClick={() => navigate('/categories')} className="text-gray-400 hover:text-white">
               ← Back to Categories
             </button>
-            <h1 className="text-2xl font-bold text-white">
-              {category?.name || 'Tasks'}
-            </h1>
+            <h1 className="text-2xl font-bold text-white">{category?.name || 'Tasks'}</h1>
           </div>
           <button
             onClick={logout}
@@ -180,7 +201,6 @@ export const Tasks: React.FC = () => {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {error && (
           <div className="mb-4 p-3 bg-red-900/50 border border-red-700 rounded text-red-200">
@@ -188,108 +208,56 @@ export const Tasks: React.FC = () => {
           </div>
         )}
 
-        {/* Controls */}
         <div className="mb-6">
           <button
-            onClick={() => setIsDialogOpen(true)}
+            onClick={() => handleAddTask(undefined)}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition"
           >
             Add Task
           </button>
         </div>
 
-        {/* Kanban Board */}
         {tasks.length === 0 ? (
           <div className="text-center py-16">
             <p className="text-gray-400 text-lg mb-4">No tasks in this category</p>
             <button
-              onClick={() => setIsDialogOpen(true)}
+              onClick={() => handleAddTask(undefined)}
               className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition"
             >
               Create your first task
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {statusColumns.map(({ status, label }) => {
-              const statusTasks = getTasksByStatus(status);
-              return (
-                <div
-                  key={status}
-                  className="bg-gray-800 rounded-lg p-4 min-h-[400px]"
-                  onDragOver={handleDragOver}
-                  onDrop={(e) => handleDrop(e, status)}
-                >
-                  <h2 className="text-xl font-bold text-white mb-4">{label}</h2>
-                  <div className="space-y-3">
-                    {statusTasks.map((task) => (
-                      <div
-                        key={task.id}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, task)}
-                        className="bg-gray-700 rounded-lg p-4 cursor-move hover:bg-gray-600 transition relative"
-                        style={getCardStyle(category?.color)}
-                      >
-                        {/* X button - top right */}
-                        <button
-                          aria-label="Delete task"
-                          onClick={(e) => handleDeleteTask(task.id, e)}
-                          className="absolute top-2 right-2 text-white/80 hover:text-white bg-black/20 hover:bg-black/30 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold"
-                        >
-                          ×
-                        </button>
-
-                        {/* Task name - bold and big */}
-                        <div className="font-bold text-lg text-white mb-2 pr-6">
-                          {task.description}
-                        </div>
-
-                        {/* Priority, deadline, estimation - small font */}
-                        <div className="text-xs text-gray-300 space-y-1 mb-4">
-                          <div className={`font-semibold ${getPriorityColor(task.priority)}`}>
-                            Priority: {task.priority || 'Medium'}
-                          </div>
-                          <div>Deadline: {formatDate(task.deadline)}</div>
-                          <div>Estimation: {formatEstimatedMinutes(task.estimatedMinutes)}</div>
-                        </div>
-
-                        {/* Info button - bottom right */}
-                        <div className="flex justify-end">
-                          <button
-                            onClick={(e) => handleInfoClick(task, e)}
-                            className="text-white/80 hover:text-white bg-black/20 hover:bg-black/30 rounded px-3 py-1 text-xs font-semibold transition"
-                            aria-label="View task details"
-                          >
-                            ℹ Info
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                    {statusTasks.length === 0 && (
-                      <div className="text-gray-500 text-sm text-center py-8">
-                        No tasks
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <KanbanBoard
+            tasks={tasks}
+            category={category}
+            statusColumns={statusColumns}
+            onAddTask={(s) => handleAddTask(s)}
+            onDeleteTask={handleDeleteTask}
+            onInfoClick={handleInfoClick}
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+            formatDate={formatDate}
+            formatEstimatedMinutes={formatEstimatedMinutes}
+          />
         )}
       </main>
 
-      {/* Add Task Dialog */}
       {categoryId && (
         <AddTaskDialog
           isOpen={isDialogOpen}
-          onClose={() => setIsDialogOpen(false)}
+          onClose={() => {
+            setIsDialogOpen(false);
+            setInitialTaskStatus(undefined);
+          }}
           categoryId={categoryId}
-          onSuccess={loadTasks}
+          onSuccess={refreshTasks}
           onError={(errorMessage) => setError(errorMessage)}
+          initialStatus={initialTaskStatus}
         />
       )}
 
-      {/* Task Info Dialog */}
       <TaskInfoDialog
         isOpen={isInfoDialogOpen}
         onClose={() => {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { taskApi } from '../services/api';
 import type { CreateTaskInputModel } from '../types';
 import { TaskPriority, TaskStatus } from '../types';
@@ -9,6 +9,7 @@ interface AddTaskDialogProps {
   categoryId: string;
   onSuccess?: () => void;
   onError?: (error: string) => void;
+  initialStatus?: TaskStatus;
 }
 
 export const AddTaskDialog: React.FC<AddTaskDialogProps> = ({
@@ -17,20 +18,28 @@ export const AddTaskDialog: React.FC<AddTaskDialogProps> = ({
   categoryId,
   onSuccess,
   onError,
+  initialStatus,
 }) => {
   const [taskDescription, setTaskDescription] = useState('');
   const [taskDeadline, setTaskDeadline] = useState('');
   const [taskPriority, setTaskPriority] = useState<TaskPriority>(TaskPriority.Medium);
-  const [taskStatus, setTaskStatus] = useState<TaskStatus>(TaskStatus.Todo);
+  const [taskStatus, setTaskStatus] = useState<TaskStatus>(initialStatus || TaskStatus.Todo);
   const [taskEstimatedMinutes, setTaskEstimatedMinutes] = useState<number | undefined>(undefined);
 
   const resetForm = () => {
     setTaskDescription('');
     setTaskDeadline('');
     setTaskPriority(TaskPriority.Medium);
-    setTaskStatus(TaskStatus.Todo);
+    setTaskStatus(initialStatus || TaskStatus.Todo);
     setTaskEstimatedMinutes(undefined);
   };
+
+  // Update status when initialStatus prop changes
+  useEffect(() => {
+    if (isOpen && initialStatus) {
+      setTaskStatus(initialStatus);
+    }
+  }, [isOpen, initialStatus]);
 
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();

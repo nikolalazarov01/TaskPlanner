@@ -104,8 +104,8 @@ export const taskApi = {
     return response.data;
   },
 
-  updateStatus: async (id: string, status: TaskStatus): Promise<number> => {
-    const response = await apiClient.patch<number>(`/task/update-status?taskId=${id}&status=${status}`);
+  updateStatus: async (id: string, status: TaskStatus, previousStatus: TaskStatus): Promise<number> => {
+    const response = await apiClient.patch<number>(`/task/update-status?taskId=${id}&status=${status}&previousStatus=${previousStatus}`);
     return response.data;
   },
 };

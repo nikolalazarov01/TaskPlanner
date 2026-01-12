@@ -142,7 +142,7 @@ export const Tasks: React.FC = () => {
       setDraggedTask(null);
 
       try {
-        await taskApi.updateStatus(draggedId, targetStatus);
+        await taskApi.updateStatus(draggedId, targetStatus, currentStatus);
         // Optional: reconcile with server without a global loading spinner
         // await refreshTasks();
       } catch (err) {

@@ -31,8 +31,10 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
     {
         var taskRepository = TestPreparationData.CreateRepository<TaskPlanner.API.Data.Models.Task>(this._mongoFixture);
         var categoryRepository = TestPreparationData.CreateRepository<Category>(this._mongoFixture);
+        var taskExecutionLogRepository = TestPreparationData.CreateRepository<TaskExecutionLog>(this._mongoFixture);
 
-        var service = new TaskService(taskRepository, categoryRepository);
+        var taskService = new TaskService(taskRepository, categoryRepository);
+        var taskLogService = new TaskLogService(taskExecutionLogRepository, taskRepository);
 
         var loggerFactory = LoggerFactory.Create(builder =>
         {
@@ -48,7 +50,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         var createValidator = new TaskValidator();
         var updateValidator = new UpdateTaskValidator();
 
-        var controller = new TaskController(service, mapper, createValidator, updateValidator);
+        var controller = new TaskController(taskService, taskLogService, mapper, createValidator, updateValidator);
 
         userId = ObjectId.GenerateNewId();
         var claims = new[] { new Claim(ClaimTypes.NameIdentifier, userId.ToString()) };
@@ -68,8 +70,10 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
     {
         var taskRepository = TestPreparationData.CreateRepository<TaskPlanner.API.Data.Models.Task>(this._mongoFixture);
         var categoryRepository = TestPreparationData.CreateRepository<Category>(this._mongoFixture);
+        var taskExecutionLogRepository = TestPreparationData.CreateRepository<TaskExecutionLog>(this._mongoFixture);
 
-        var service = new TaskService(taskRepository, categoryRepository);
+        var taskService = new TaskService(taskRepository, categoryRepository);
+        var taskLogService = new TaskLogService(taskExecutionLogRepository, taskRepository);
 
         var loggerFactory = LoggerFactory.Create(builder =>
         {
@@ -85,7 +89,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         var createValidator = new TaskValidator();
         var updateValidator = new UpdateTaskValidator();
 
-        var controller = new TaskController(service, mapper, createValidator, updateValidator);
+        var controller = new TaskController(taskService, taskLogService, mapper, createValidator, updateValidator);
 
         controller.ControllerContext = new ControllerContext
         {
@@ -659,7 +663,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
     {
         var controller = CreateAuthenticatedController(out _);
 
-        var result = await controller.UpdateStatus(null, TaskStatus.Done, CancellationToken.None);
+        var result = await controller.UpdateStatus(null, TaskStatus.Done, TaskStatus.InProgress, CancellationToken.None);
 
         var badRequest = Assert.IsType<BadRequestResult>(result);
         Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
@@ -670,7 +674,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
     {
         var controller = CreateAuthenticatedController(out _);
 
-        var result = await controller.UpdateStatus(Array.Empty<ObjectId>(), TaskStatus.Done, CancellationToken.None);
+        var result = await controller.UpdateStatus(Array.Empty<ObjectId>(), TaskStatus.Done, TaskStatus.InProgress, CancellationToken.None);
 
         var badRequest = Assert.IsType<BadRequestResult>(result);
         Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
@@ -681,7 +685,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
     {
         var controller = CreateUnauthenticatedController();
 
-        var result = await controller.UpdateStatus(new[] { ObjectId.GenerateNewId() }, TaskStatus.Done,
+        var result = await controller.UpdateStatus(new[] { ObjectId.GenerateNewId() }, TaskStatus.Done, TaskStatus.InProgress,
             CancellationToken.None);
 
         var unauthorized = Assert.IsType<UnauthorizedResult>(result);
@@ -702,7 +706,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
 
         var missingTaskId = ObjectId.GenerateNewId();
 
-        var result = await controller.UpdateStatus(new[] { existingTaskId, missingTaskId }, TaskStatus.Done,
+        var result = await controller.UpdateStatus(new[] { existingTaskId, missingTaskId }, TaskStatus.Done, TaskStatus.InProgress,
             CancellationToken.None);
 
         var notFound = Assert.IsType<NotFoundObjectResult>(result);
@@ -741,7 +745,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
 
         // userA tries to update both tasks (one belongs to userB)
         var result = await controllerA.UpdateStatus(
-            new[] { taskAId, taskBId }, TaskStatus.Done, CancellationToken.None);
+            new[] { taskAId, taskBId }, TaskStatus.Done, TaskStatus.InProgress, CancellationToken.None);
 
         var notFound = Assert.IsType<NotFoundObjectResult>(result);
         Assert.Equal(StatusCodes.Status404NotFound, notFound.StatusCode);
@@ -781,7 +785,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         var seed1 = await InsertTaskAsync(userId, categoryId, taskId1, CancellationToken.None);
         var seed2 = await InsertTaskAsync(userId, categoryId, taskId2, CancellationToken.None);
 
-        var result = await controller.UpdateStatus(new[] { taskId1, taskId2 }, TaskStatus.Done, CancellationToken.None);
+        var result = await controller.UpdateStatus(new[] { taskId1, taskId2 }, TaskStatus.Done, TaskStatus.InProgress, CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result);
         Assert.Equal(StatusCodes.Status200OK, ok.StatusCode);
@@ -819,7 +823,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         var seed = await InsertTaskAsync(userId, categoryId, existingTaskId, CancellationToken.None);
 
         // ObjectId.Empty will never exist in DB, so service should return NotFound and not update
-        var result = await controller.UpdateStatus(new[] { existingTaskId, ObjectId.Empty }, TaskStatus.Done,
+        var result = await controller.UpdateStatus(new[] { existingTaskId, ObjectId.Empty }, TaskStatus.Done, TaskStatus.InProgress,
             CancellationToken.None);
 
         var notFound = Assert.IsType<BadRequestResult>(result);
@@ -841,7 +845,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
     {
         var controller = CreateAuthenticatedController(out _);
 
-        var result = await controller.UpdateStatusOne(ObjectId.Empty, TaskStatus.Done, CancellationToken.None);
+        var result = await controller.UpdateStatusOne(ObjectId.Empty, TaskStatus.Done, TaskStatus.InProgress, CancellationToken.None);
 
         var badRequest = Assert.IsType<BadRequestResult>(result);
         Assert.Equal(StatusCodes.Status400BadRequest, badRequest.StatusCode);
@@ -853,7 +857,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         var controller = CreateUnauthenticatedController();
 
         var result =
-            await controller.UpdateStatusOne(ObjectId.GenerateNewId(), TaskStatus.Done, CancellationToken.None);
+            await controller.UpdateStatusOne(ObjectId.GenerateNewId(), TaskStatus.Done, TaskStatus.InProgress, CancellationToken.None);
 
         var unauthorized = Assert.IsType<UnauthorizedResult>(result);
         Assert.Equal(StatusCodes.Status401Unauthorized, unauthorized.StatusCode);
@@ -865,7 +869,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         var controller = CreateAuthenticatedController(out _);
 
         var result =
-            await controller.UpdateStatusOne(ObjectId.GenerateNewId(), TaskStatus.Done, CancellationToken.None);
+            await controller.UpdateStatusOne(ObjectId.GenerateNewId(), TaskStatus.Done, TaskStatus.InProgress, CancellationToken.None);
 
         var notFound = Assert.IsType<NotFoundObjectResult>(result);
         Assert.Equal(StatusCodes.Status404NotFound, notFound.StatusCode);
@@ -884,7 +888,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         var taskId = ObjectId.GenerateNewId();
         var seed = await InsertTaskAsync(userA, categoryA, taskId, CancellationToken.None);
 
-        var result = await controllerB.UpdateStatusOne(taskId, TaskStatus.Done, CancellationToken.None);
+        var result = await controllerB.UpdateStatusOne(taskId, TaskStatus.Done, TaskStatus.InProgress, CancellationToken.None);
 
         var notFound = Assert.IsType<NotFoundObjectResult>(result);
         Assert.Equal(StatusCodes.Status404NotFound, notFound.StatusCode);
@@ -912,7 +916,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         var taskId = ObjectId.GenerateNewId();
         var seed = await InsertTaskAsync(userId, categoryId, taskId, CancellationToken.None);
 
-        var result = await controller.UpdateStatusOne(taskId, TaskStatus.Done, CancellationToken.None);
+        var result = await controller.UpdateStatusOne(taskId, TaskStatus.Done, TaskStatus.InProgress, CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result);
         Assert.Equal(StatusCodes.Status200OK, ok.StatusCode);

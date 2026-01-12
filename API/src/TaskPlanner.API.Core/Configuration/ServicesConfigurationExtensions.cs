@@ -14,5 +14,6 @@ public static class ServicesConfigurationExtensions
         serviceCollection.AddScoped<IIdentityService, IdentityService>();
         serviceCollection.AddScoped<ICategoryService, CategoryService>();
         serviceCollection.AddScoped<ITaskService, TaskService>();
+        serviceCollection.AddScoped<ITaskLogService, TaskLogService>();
     }
 }

@@ -19,13 +19,15 @@ namespace TaskPlanner.API.Web.Controllers;
 public class TaskController : ControllerBase
 {
     private readonly ITaskService _taskService;
+    private readonly ITaskLogService _taskLogService;
     private readonly IValidator<CreateTaskInputModel> _createTaskRequestValidator;
     private readonly IValidator<UpdateTaskInputModel> _updateTaskRequestValidator;
     private readonly IMapper _mapper;
 
-    public TaskController(ITaskService taskService, IMapper mapper, IValidator<CreateTaskInputModel> createTaskRequestValidator, IValidator<UpdateTaskInputModel> updateTaskRequestValidator)
+    public TaskController(ITaskService taskService, ITaskLogService taskLogService, IMapper mapper, IValidator<CreateTaskInputModel> createTaskRequestValidator, IValidator<UpdateTaskInputModel> updateTaskRequestValidator)
     {
         _taskService = taskService;
+        _taskLogService = taskLogService;
         _mapper = mapper;
         _createTaskRequestValidator = createTaskRequestValidator;
         _updateTaskRequestValidator = updateTaskRequestValidator;

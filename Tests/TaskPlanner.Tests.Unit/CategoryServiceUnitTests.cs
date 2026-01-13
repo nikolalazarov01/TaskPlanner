@@ -108,7 +108,7 @@ public class CategoryServiceTests
 
         var result = await sut.UpdateCategory(input, ObjectId.GenerateNewId(), CancellationToken.None);
 
-        repo.Verify(x => x.ModifyAsync(It.IsAny<Category>(), It.IsAny<CancellationToken>(), It.IsAny<UpdateDefinition<Category>>()), Times.Never);
+        repo.Verify(x => x.ModifyAsync(It.IsAny<Category>(), It.IsAny<CancellationToken>(), It.IsAny<UpdateDefinition<Category>>(), It.IsAny<bool>()), Times.Never);
 
         Assert.False(result.Success);
         Assert.Contains(result.Errors, e => e.ToString()!.Contains("Invalid category id."));
@@ -129,7 +129,7 @@ public class CategoryServiceTests
 
         var result = await sut.UpdateCategory(input, ObjectId.GenerateNewId(), CancellationToken.None);
 
-        repo.Verify(x => x.ModifyAsync(It.IsAny<Category>(), It.IsAny<CancellationToken>(), It.IsAny<UpdateDefinition<Category>>()), Times.Never);
+        repo.Verify(x => x.ModifyAsync(It.IsAny<Category>(), It.IsAny<CancellationToken>(), It.IsAny<UpdateDefinition<Category>>(), It.IsAny<bool>()), Times.Never);
 
         Assert.False(result.Success);
         Assert.Contains(result.Errors, e => e.ToString()!.Contains("No fields provided for update."));
@@ -144,7 +144,7 @@ public class CategoryServiceTests
         UpdateDefinition<Category>? capturedUpdate = null;
         CancellationToken capturedToken = default;
 
-        repo.Setup(x => x.ModifyAsync(It.IsAny<Category>(), It.IsAny<CancellationToken>(), It.IsAny<UpdateDefinition<Category>>()))
+        repo.Setup(x => x.ModifyAsync(It.IsAny<Category>(), It.IsAny<CancellationToken>(), It.IsAny<UpdateDefinition<Category>>(), It.IsAny<bool>()))
             .Callback<Category, CancellationToken, UpdateDefinition<Category>>((e, ct, u) =>
             {
                 capturedEntity = e;
@@ -164,7 +164,7 @@ public class CategoryServiceTests
 
         await sut.UpdateCategory(input, ObjectId.GenerateNewId(), cts.Token);
 
-        repo.Verify(x => x.ModifyAsync(It.IsAny<Category>(), It.IsAny<CancellationToken>(), It.IsAny<UpdateDefinition<Category>>()), Times.Once);
+        repo.Verify(x => x.ModifyAsync(It.IsAny<Category>(), It.IsAny<CancellationToken>(), It.IsAny<UpdateDefinition<Category>>(), It.IsAny<bool>()), Times.Once);
 
         Assert.NotNull(capturedEntity);
         Assert.Equal(id, capturedEntity!.Id);
@@ -187,7 +187,7 @@ public class CategoryServiceTests
 
         UpdateDefinition<Category>? capturedUpdate = null;
 
-        repo.Setup(x => x.ModifyAsync(It.IsAny<Category>(), It.IsAny<CancellationToken>(), It.IsAny<UpdateDefinition<Category>>()))
+        repo.Setup(x => x.ModifyAsync(It.IsAny<Category>(), It.IsAny<CancellationToken>(), It.IsAny<UpdateDefinition<Category>>(), It.IsAny<bool>()))
             .Callback<Category, CancellationToken, UpdateDefinition<Category>>((_, __, u) => capturedUpdate = u)
             .ReturnsAsync(new OperationResult<Category>());
 
@@ -203,7 +203,7 @@ public class CategoryServiceTests
 
         await sut.UpdateCategory(input, ObjectId.GenerateNewId(), CancellationToken.None);
 
-        repo.Verify(x => x.ModifyAsync(It.Is<Category>(c => c.Id == id), It.IsAny<CancellationToken>(), It.IsAny<UpdateDefinition<Category>>()), Times.Once);
+        repo.Verify(x => x.ModifyAsync(It.Is<Category>(c => c.Id == id), It.IsAny<CancellationToken>(), It.IsAny<UpdateDefinition<Category>>(), It.IsAny<bool>()), Times.Once);
 
         Assert.NotNull(capturedUpdate);
         var rendered = RenderUpdate(capturedUpdate!);
@@ -452,7 +452,7 @@ public class CategoryServiceTests
         repo.Setup(x => x.ModifyAsync(
                 It.Is<Category>(c => c.Id == id), 
                 It.IsAny<CancellationToken>(), 
-                It.IsAny<UpdateDefinition<Category>>()))
+                It.IsAny<UpdateDefinition<Category>>(), It.IsAny<bool>()))
             .ReturnsAsync(new OperationResult<Category>().WithRelatedObject(updatedCategory));
         
         var input = new UpdateCategoryInputModel
@@ -479,7 +479,7 @@ public class CategoryServiceTests
         repo.Setup(x => x.ModifyAsync(
                 It.IsAny<Category>(), 
                 It.IsAny<CancellationToken>(), 
-                It.IsAny<UpdateDefinition<Category>>()))
+                It.IsAny<UpdateDefinition<Category>>(), It.IsAny<bool>()))
             .ReturnsAsync(failedResult);
         
         var input = new UpdateCategoryInputModel

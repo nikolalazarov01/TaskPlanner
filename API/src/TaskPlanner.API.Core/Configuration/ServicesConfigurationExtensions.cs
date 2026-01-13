@@ -15,5 +15,7 @@ public static class ServicesConfigurationExtensions
         serviceCollection.AddScoped<ICategoryService, CategoryService>();
         serviceCollection.AddScoped<ITaskService, TaskService>();
         serviceCollection.AddScoped<ITaskLogService, TaskLogService>();
+        serviceCollection.AddScoped<IUserProfileRecomputeQueueService, UserProfileRecomputeQueueService>();
+        serviceCollection.AddScoped<IUserProfileService, UserProfileService>();
     }
 }

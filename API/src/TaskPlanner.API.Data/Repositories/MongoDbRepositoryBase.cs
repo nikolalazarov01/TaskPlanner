@@ -125,7 +125,7 @@ public class MongoDbRepositoryBase<TEntity> : IBaseRepository<TEntity>
     }
     
     /// <inheritdoc/>
-    public async Task<OperationResult<TEntity>> ModifyAsync(TEntity entity, CancellationToken cancellationToken, UpdateDefinition<TEntity> update = null)
+    public async Task<OperationResult<TEntity>> ModifyAsync(TEntity entity, CancellationToken cancellationToken, UpdateDefinition<TEntity> update = null, bool isUpsert = false)
     {
         var result = new OperationResult<TEntity>();
 
@@ -135,7 +135,7 @@ public class MongoDbRepositoryBase<TEntity> : IBaseRepository<TEntity>
 
             var options = new FindOneAndUpdateOptions<TEntity>
             {
-                IsUpsert = false,
+                IsUpsert = isUpsert,
                 ReturnDocument = ReturnDocument.After
             };
 
@@ -153,6 +153,54 @@ public class MongoDbRepositoryBase<TEntity> : IBaseRepository<TEntity>
             (e.WriteError?.Category == ServerErrorCategory.DuplicateKey)
         {
             result.AppendError(new DuplicateKeyError(e.WriteError.Message));
+            return result;
+        }
+    }
+    
+    /// <inheritdoc/>
+    public async Task<OperationResult<TEntity>> ModifyAsync(FilterDefinition<TEntity> filter, UpdateDefinition<TEntity> update, CancellationToken cancellationToken, bool isUpsert = false)
+    {
+        var result = new OperationResult<TEntity>();
+
+        try
+        {
+            filter ??= Builders<TEntity>.Filter.Empty;
+
+            if (update is null)
+                return result.AppendError("Update definition must be provided.");
+
+            var options = new FindOneAndUpdateOptions<TEntity>
+            {
+                IsUpsert = isUpsert,
+                ReturnDocument = ReturnDocument.After
+            };
+
+            var updatedEntity = Session is null
+                ? await Collection.FindOneAndUpdateAsync(filter, update, options, cancellationToken)
+                : await Collection.FindOneAndUpdateAsync(Session, filter, update, options, cancellationToken);
+
+            // If not upserting, treat null as "not found"
+            if (updatedEntity is null && !isUpsert)
+            {
+                result.AppendError(new NotFoundError("Entity not found."));
+                return result;
+            }
+
+            // If upserting, Mongo should return the inserted/updated document with ReturnDocument.After.
+            // If it still returned null, consider it an error.
+            if (updatedEntity is null && isUpsert)
+                return result.AppendError("Upsert failed to return the updated entity.");
+
+            return result.WithRelatedObject(updatedEntity);
+        }
+        catch (MongoWriteException e) when (e.WriteError?.Category == ServerErrorCategory.DuplicateKey)
+        {
+            result.AppendError(new DuplicateKeyError(e.WriteError.Message));
+            return result;
+        }
+        catch (Exception ex)
+        {
+            result.AppendError(ex.Message);
             return result;
         }
     }

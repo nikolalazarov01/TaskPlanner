@@ -42,8 +42,22 @@ public interface IBaseRepository<TEntity> where TEntity : IEntity
     /// <param name="entity">The entity, being modified</param>
     /// <param name="cancellationToken">An instance of <see cref="CancellationToken"/></param>
     /// <param name="update">Update definitions, stating which properties should be modified</param>
+    /// <param name="isUpsert">A flag indicating whether to insert a new entity if no matches are found</param>
     /// <returns><see cref="OperationResult"/>With result object containing the modified entity</returns>
-    Task<OperationResult<TEntity>> ModifyAsync(TEntity entity, CancellationToken cancellationToken, UpdateDefinition<TEntity> update = null);
+    Task<OperationResult<TEntity>> ModifyAsync(TEntity entity, CancellationToken cancellationToken, UpdateDefinition<TEntity> update = null, bool isUpsert = false);
+
+    /// <summary>
+    /// Applies an update to a single entity matching the provided filter and returns the updated document.
+    /// Supports optional upsert behavior.
+    /// </summary>
+    /// <param name="filter">The filter used to select the entity to update.</param>
+    /// <param name="update">The update definition to apply.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <param name="isUpsert">
+    /// If true, inserts a new entity when no document matches the filter.
+    /// </param>
+    /// <returns>The updated (or inserted) entity.</returns>
+    Task<OperationResult<TEntity>> ModifyAsync(FilterDefinition<TEntity> filter, UpdateDefinition<TEntity> update, CancellationToken cancellationToken, bool isUpsert = false);
     
     /// <summary>
     /// A method, used for modifying many entities using the provided update definition

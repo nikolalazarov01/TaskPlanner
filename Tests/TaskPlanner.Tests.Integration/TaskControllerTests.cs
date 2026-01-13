@@ -32,9 +32,11 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         var taskRepository = TestPreparationData.CreateRepository<TaskPlanner.API.Data.Models.Task>(this._mongoFixture);
         var categoryRepository = TestPreparationData.CreateRepository<Category>(this._mongoFixture);
         var taskExecutionLogRepository = TestPreparationData.CreateRepository<TaskExecutionLog>(this._mongoFixture);
+        var userProfileRecomputeQueueRepository = TestPreparationData.CreateRepository<UserProfileRecomputeQueue>(this._mongoFixture);
 
         var taskService = new TaskService(taskRepository, categoryRepository);
         var taskLogService = new TaskLogService(taskExecutionLogRepository, taskRepository);
+        var userProfileRecomputeQueueService = new UserProfileRecomputeQueueService(userProfileRecomputeQueueRepository);
 
         var loggerFactory = LoggerFactory.Create(builder =>
         {
@@ -50,7 +52,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         var createValidator = new TaskValidator();
         var updateValidator = new UpdateTaskValidator();
 
-        var controller = new TaskController(taskService, taskLogService, mapper, createValidator, updateValidator);
+        var controller = new TaskController(taskService, taskLogService, userProfileRecomputeQueueService, mapper, createValidator, updateValidator);
 
         userId = ObjectId.GenerateNewId();
         var claims = new[] { new Claim(ClaimTypes.NameIdentifier, userId.ToString()) };
@@ -71,9 +73,11 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         var taskRepository = TestPreparationData.CreateRepository<TaskPlanner.API.Data.Models.Task>(this._mongoFixture);
         var categoryRepository = TestPreparationData.CreateRepository<Category>(this._mongoFixture);
         var taskExecutionLogRepository = TestPreparationData.CreateRepository<TaskExecutionLog>(this._mongoFixture);
+        var userProfileRecomputeQueueRepository = TestPreparationData.CreateRepository<UserProfileRecomputeQueue>(this._mongoFixture);
 
         var taskService = new TaskService(taskRepository, categoryRepository);
         var taskLogService = new TaskLogService(taskExecutionLogRepository, taskRepository);
+        var userProfileRecomputeQueueService = new UserProfileRecomputeQueueService(userProfileRecomputeQueueRepository);
 
         var loggerFactory = LoggerFactory.Create(builder =>
         {
@@ -89,7 +93,7 @@ public class TaskControllerTests : IClassFixture<Mongo2GoFixture>
         var createValidator = new TaskValidator();
         var updateValidator = new UpdateTaskValidator();
 
-        var controller = new TaskController(taskService, taskLogService, mapper, createValidator, updateValidator);
+        var controller = new TaskController(taskService, taskLogService, userProfileRecomputeQueueService, mapper, createValidator, updateValidator);
 
         controller.ControllerContext = new ControllerContext
         {

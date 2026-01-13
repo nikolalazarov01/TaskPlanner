@@ -7,6 +7,7 @@ using MongoDB.Bson;
 using OneBitSoftware.Utilities;
 using TaskPlanner.API.Core.Interfaces;
 using TaskPlanner.API.Core.Models.Task;
+using TaskPlanner.API.Data.Models;
 using TaskPlanner.API.Utilities;
 using TaskPlanner.API.Web.Extensions;
 using TaskStatus = TaskPlanner.API.Data.Models.TaskStatus;
@@ -20,14 +21,16 @@ public class TaskController : ControllerBase
 {
     private readonly ITaskService _taskService;
     private readonly ITaskLogService _taskLogService;
+    private readonly IUserProfileRecomputeQueueService _userProfileRecomputeQueueService;
     private readonly IValidator<CreateTaskInputModel> _createTaskRequestValidator;
     private readonly IValidator<UpdateTaskInputModel> _updateTaskRequestValidator;
     private readonly IMapper _mapper;
 
-    public TaskController(ITaskService taskService, ITaskLogService taskLogService, IMapper mapper, IValidator<CreateTaskInputModel> createTaskRequestValidator, IValidator<UpdateTaskInputModel> updateTaskRequestValidator)
+    public TaskController(ITaskService taskService, ITaskLogService taskLogService, IUserProfileRecomputeQueueService userProfileRecomputeQueueService, IMapper mapper, IValidator<CreateTaskInputModel> createTaskRequestValidator, IValidator<UpdateTaskInputModel> updateTaskRequestValidator)
     {
         _taskService = taskService;
         _taskLogService = taskLogService;
+        _userProfileRecomputeQueueService = userProfileRecomputeQueueService;
         _mapper = mapper;
         _createTaskRequestValidator = createTaskRequestValidator;
         _updateTaskRequestValidator = updateTaskRequestValidator;
@@ -411,7 +414,7 @@ public class TaskController : ControllerBase
 
         if (!this.TryGetUserObjectId(out var userId)) return Unauthorized();
 
-        OperationResult<long> result = taskIds.Length == 1
+        var result = taskIds.Length == 1
             ? await _taskService.ModifyTaskStatus(taskIds[0], userId, status, cancellationToken)
             : await _taskService.ModifyManyTaskStatus(taskIds, userId, status, cancellationToken);
 
@@ -427,6 +430,7 @@ public class TaskController : ControllerBase
             ? await _taskLogService.LogStatusChange(userId, taskIds[0], previousStatus, status, cancellationToken)
             : await _taskLogService.LogBulkStatusChange(userId, taskIds, previousStatus, status, cancellationToken);
 
+        if (logResult.Success) await _userProfileRecomputeQueueService.EnqueueAsync(userId, UserProfileRecomputeReason.TaskEvent, cancellationToken);
 
         return Ok(result.ResultObject);
     }

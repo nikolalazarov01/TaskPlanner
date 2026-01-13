@@ -107,6 +107,23 @@ public class UserProfileService : IUserProfileService
 
         return result.WithRelatedObject(successCount);
     }
+    
+    /// <inheritdoc/>
+    public async Task<OperationResult<UserProfile>> GetUserProfile(ObjectId userId, CancellationToken cancellationToken)
+    {
+        var result = new OperationResult<UserProfile>();
+
+        if (userId == ObjectId.Empty)
+            return result.AppendError("Invalid user id.");
+
+        var filter = Builders<UserProfile>.Filter.Eq(x => x.UserId, userId);
+
+        var get = await _userProfileRepository.GetOneAsync(filter, cancellationToken);
+        if (!get.Success)
+            return result.AppendErrors(get);
+
+        return result.WithRelatedObject(get.ResultObject);
+    }
 
     private static BsonDocument ComputeProfile(int windowDays, IReadOnlyCollection<TaskExecutionLog> logs, IReadOnlyDictionary<ObjectId, Data.Models.Task> taskById)
     {

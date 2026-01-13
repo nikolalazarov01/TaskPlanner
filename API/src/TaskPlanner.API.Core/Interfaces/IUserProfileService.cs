@@ -28,4 +28,12 @@ public interface IUserProfileService
     /// <param name="windowDays">The rolling window in days used for computations.</param>
     /// <returns>The number of successfully recomputed users.</returns>
     Task<OperationResult<long>> RecomputeUsersAsync(ObjectId[] userIds, CancellationToken cancellationToken, int windowDays = 14);
+    
+    /// <summary>
+    /// Retrieves the most recently computed user profile for the specified user.
+    /// </summary>
+    /// <param name="userId">The unique identifier of the user whose profile should be retrieved.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The <see cref="UserProfile"/> document for the user.</returns>
+    Task<OperationResult<UserProfile>> GetUserProfile(ObjectId userId, CancellationToken cancellationToken);
 }

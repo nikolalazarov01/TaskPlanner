@@ -1,5 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using MongoDB.Bson;
 using TaskPlanner.API.Core.Interfaces;
+using TaskPlanner.API.Data.Models;
+using TaskPlanner.API.Utilities;
 
 namespace TaskPlanner.API.Web.Controllers;
 
@@ -18,10 +21,72 @@ public class UserProfileController : ControllerBase
     private readonly IUserProfileRecomputeQueueService _userProfileRecomputeQueueService;
     private readonly IUserProfileService _userProfileService;
 
+    /// <summary>
+    /// Profiles older than this threshold are considered stale and will be recomputed.
+    /// </summary>
+    private static readonly TimeSpan FreshnessThreshold = TimeSpan.FromHours(12);
+    
     public UserProfileController(IUserProfileRecomputeQueueService userProfileRecomputeQueueService, IUserProfileService userProfileService)
     {
         _userProfileRecomputeQueueService = userProfileRecomputeQueueService;
         _userProfileService = userProfileService;
+    }
+
+    /// <summary>
+    /// Retrieves a user profile by user id.
+    /// If the profile is missing or stale, it triggers a recomputation and returns the updated profile.
+    /// </summary>
+    /// <param name="userId">The identifier of the user whose profile should be returned.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Returns the user profile.</returns>
+    /// <remarks>
+    /// A profile is considered stale if it was computed earlier than the configured freshness threshold.
+    /// When stale (or missing), the profile is recomputed before returning.
+    /// </remarks>
+    /// <response code="200">Returns the user profile.</response>
+    /// <response code="400">The request is invalid or an error occurred.</response>
+    /// <response code="401">The request is unauthorized.</response>
+    /// <response code="404">The profile was not found and recomputation failed to create it.</response>
+    [HttpGet("{userId}")]
+    public async Task<IActionResult> GetUserProfileAsync([FromRoute] ObjectId userId, CancellationToken cancellationToken)
+    {
+        if (userId == ObjectId.Empty) return BadRequest();
+
+        var getUserProfile = await _userProfileService.GetUserProfile(userId, cancellationToken);
+
+        if (!getUserProfile.Success)
+        {
+            if (getUserProfile.Errors.Any(e => e is NotFoundError))
+            {
+                var recomputeMissing = await _userProfileService.RecomputeUserAsync(userId, cancellationToken);
+                if (!recomputeMissing.Success) return BadRequest(recomputeMissing.Errors);
+
+                if (recomputeMissing.ResultObject is null) return NotFound();
+
+                return Ok(recomputeMissing.ResultObject);
+            }
+
+            return BadRequest(getUserProfile.Errors);
+        }
+
+        var profile = getUserProfile.ResultObject;
+        if (profile is null) return NotFound();
+
+        var isFresh = (DateTime.UtcNow - profile.ComputedAt) <= FreshnessThreshold;
+
+        if (!isFresh)
+        {
+            var enqueue = await _userProfileRecomputeQueueService.EnqueueAsync(userId, UserProfileRecomputeReason.TaskEvent, cancellationToken);
+
+            var recompute = await _userProfileService.RecomputeUserAsync(userId, cancellationToken, profile.WindowDays);
+            if (!recompute.Success) return BadRequest(recompute.Errors);
+
+            if (recompute.ResultObject is null) return NotFound();
+
+            return Ok(recompute.ResultObject);
+        }
+
+        return Ok(profile);
     }
 
     /// <summary>

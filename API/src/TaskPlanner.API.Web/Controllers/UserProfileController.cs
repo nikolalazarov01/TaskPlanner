@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using MongoDB.Bson;
 using TaskPlanner.API.Core.Interfaces;
 using TaskPlanner.API.Data.Models;
@@ -111,6 +112,7 @@ public class UserProfileController : ControllerBase
     /// <response code="400">Returned when fetching queued users or recomputation fails.</response>
     /// <response code="401">Returned when the request is unauthorized.</response>
     [HttpPost("recompute")]
+    [AllowAnonymous]
     public async Task<IActionResult> Recompute(CancellationToken cancellationToken)
     {
         var getQueuedUsers = await this._userProfileRecomputeQueueService.GetAllQueuedAsync(cancellationToken);

@@ -9,6 +9,13 @@
     }
   },
   "profiles": {
+    "TaskPlanner": {
+      "commandName": "Project",
+      "applicationUrl": "http://0.0.0.0:30458",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
     "http": {
       "commandName": "Project",
       "dotnetRunMessages": true,
